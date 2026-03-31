@@ -134,7 +134,7 @@ def list_users():
                 </tr>
                 {% endfor %}
               {% else %}
-                <tr><td colspan="3">No users found.</td></tr>
+                                <tr><td colspan="3">No users found.</td></tr>
               {% endif %}
             </tbody>
           </table>
@@ -144,8 +144,6 @@ def list_users():
         """,
         rows=rows,
     )
-
-
 if __name__ == "__main__":
     init_db()
     app.run(debug=True)
