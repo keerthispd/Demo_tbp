@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>CryptoSafe Registration</title>
+	<style>
+		:root {
+			--bg: #f7f4ed;
+			--panel: #fffdf8;
+			--ink: #1f2a37;
+			--accent: #006d77;
+			--accent-soft: #83c5be;
+			--danger: #9b2226;
+			--ring: rgba(0, 109, 119, 0.25);
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		body {
+			margin: 0;
+			min-height: 100vh;
+			font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+			background:
+				radial-gradient(circle at 10% 20%, rgba(131, 197, 190, 0.25), transparent 35%),
+				radial-gradient(circle at 90% 80%, rgba(0, 109, 119, 0.18), transparent 30%),
+				var(--bg);
+			color: var(--ink);
+			display: grid;
+			place-items: center;
+			padding: 20px;
+		}
+
+		.card {
+			width: 100%;
+			max-width: 460px;
+			background: var(--panel);
+			border: 1px solid rgba(0, 109, 119, 0.15);
+			border-radius: 18px;
+			box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
+			padding: 28px;
+		}
+
+		h1 {
+			margin: 0 0 8px;
+			font-size: 1.8rem;
+			letter-spacing: 0.02em;
+		}
+
+		p {
+			margin: 0 0 20px;
+			color: #40566f;
+		}
+
+		label {
+			display: block;
+			margin-bottom: 7px;
+			font-weight: 700;
+			font-size: 0.93rem;
+		}
+
+		.field {
+			margin-bottom: 15px;
+		}
+
+		input {
+			width: 100%;
+			border: 1px solid #cbd5e1;
+			border-radius: 10px;
+			padding: 12px 13px;
+			font: inherit;
+			color: var(--ink);
+			background: #ffffff;
+			outline: none;
+			transition: border-color 0.2s ease, box-shadow 0.2s ease;
+		}
+
+		input:focus {
+			border-color: var(--accent);
+			box-shadow: 0 0 0 4px var(--ring);
+		}
+
+		button {
+			width: 100%;
+			border: 0;
+			border-radius: 10px;
+			padding: 12px 14px;
+			font: inherit;
+			font-weight: 700;
+			color: #ffffff;
+			background: linear-gradient(135deg, var(--accent), #0a9396);
+			cursor: pointer;
+			transition: transform 0.15s ease, filter 0.15s ease;
+		}
+
+		button:hover {
+			filter: brightness(1.05);
+			transform: translateY(-1px);
+		}
+
+		.note {
+			margin-top: 14px;
+			font-size: 0.85rem;
+			color: #556b83;
+		}
+
+		.danger {
+			color: var(--danger);
+		}
+	</style>
+</head>
+<body>
+	<main class="card">
+		<h1>Create Your CryptoSafe Account</h1>
+		<p>Register with a unique user ID and password.</p>
+
+		<form action="/register" method="POST">
+			<div class="field">
+				<label for="userid">User ID</label>
+				<input id="userid" name="userid" type="text" minlength="3" maxlength="40" required />
+			</div>
+
+			<div class="field">
+				<label for="password">Password</label>
+				<input id="password" name="password" type="password" minlength="6" maxlength="128" required />
+			</div>
+
+			<button type="submit">Create Account</button>
+			<p class="note">Password is securely hashed before being stored in the database.</p>
+			<p class="note">Open this page using the running server URL, not as a local file.</p>
+		</form>
+	</main>
+</body>
+</html>

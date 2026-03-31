@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registration Result</title>
+  <style>
+    :root {
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --ok: #1d6f42;
+      --ok-soft: #e9f8ef;
+      --fail: #8b1e3f;
+      --fail-soft: #fceef2;
+      --ink: #243447;
+      --muted: #52677d;
+      --btn: #0b7285;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background:
+        linear-gradient(160deg, rgba(11, 114, 133, 0.1), transparent 35%),
+        linear-gradient(330deg, rgba(29, 111, 66, 0.12), transparent 45%),
+        var(--bg);
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+    }
+
+    .panel {
+      width: 100%;
+      max-width: 540px;
+      background: var(--card);
+      border-radius: 16px;
+      border: 1px solid rgba(36, 52, 71, 0.1);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+      padding: 26px;
+      animation: rise 0.5s ease;
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .badge {
+      display: inline-block;
+      font-weight: 700;
+      padding: 7px 10px;
+      border-radius: 999px;
+      margin-bottom: 14px;
+      font-size: 0.85rem;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 1.7rem;
+    }
+
+    p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    a {
+      text-decoration: none;
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-weight: 700;
+      transition: transform 0.15s ease, filter 0.15s ease;
+    }
+
+    a:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.04);
+    }
+
+    .primary {
+      background: var(--btn);
+      color: #fff;
+    }
+
+    .secondary {
+      border: 1px solid rgba(36, 52, 71, 0.2);
+      color: var(--ink);
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <main class="panel">
+    <div id="badge" class="badge"></div>
+    <h1 id="title"></h1>
+    <p id="message"></p>
+    <div class="actions" id="actions"></div>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("status");
+    const reason = params.get("reason") || "Something went wrong.";
+
+    const badge = document.getElementById("badge");
+    const title = document.getElementById("title");
+    const message = document.getElementById("message");
+    const actions = document.getElementById("actions");
+
+    if (status === "success") {
+      badge.textContent = "SUCCESS";
+      badge.style.background = "var(--ok-soft)";
+      badge.style.color = "var(--ok)";
+      title.textContent = "Account Created Successfully";
+      message.textContent = "Your CryptoSafe account has been created. You can now proceed to the next step.";
+
+      const viewUsersLink = document.createElement("a");
+      viewUsersLink.href = "/users";
+      viewUsersLink.className = "secondary";
+      viewUsersLink.textContent = "View Stored Users";
+
+      const registerAgainLink = document.createElement("a");
+      registerAgainLink.href = "/registration.html";
+      registerAgainLink.className = "primary";
+      registerAgainLink.textContent = "Create Another Account";
+
+      actions.append(viewUsersLink, registerAgainLink);
+    } else {
+      badge.textContent = "FAILED";
+      badge.style.background = "var(--fail-soft)";
+      badge.style.color = "var(--fail)";
+      title.textContent = "Account Creation Failed";
+      message.textContent = reason;
+
+      const retryLink = document.createElement("a");
+      retryLink.href = "/registration.html";
+      retryLink.className = "primary";
+      retryLink.textContent = "Retry Registration";
+
+      actions.append(retryLink);
+    }
+  </script>
+</body>
+</html>
