@@ -9,7 +9,7 @@ This demo now uses Flask + SQLite for registration.
 - Password is hashed before storage (not plain text)[temporary hash algorithm only for demo not for deployment]
 - Duplicate user IDs are rejected on the registration page with an inline message
 - Login with session-based dashboard access
-- Accounts lock for 24 hours after 5 failed password attempts
+- Accounts lock for 24 hours after 3 failed password attempts
 - Success/failure landing page after account creation
 - Retry option on failure
 - Dashboard home page after login

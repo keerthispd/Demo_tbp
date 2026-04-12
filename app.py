@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import os
+import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -16,7 +17,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "cryptosafe.db"
 LOCKOUT_DURATION = timedelta(hours=24)
-MAX_FAILED_ATTEMPTS = 5
+MAX_FAILED_ATTEMPTS = 3
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
@@ -155,6 +156,14 @@ def payload_value(name: str) -> str:
     if isinstance(payload, dict):
         return str(payload.get(name, ""))
     return str(request.form.get(name, ""))
+
+
+def legacy_file_name(title: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", title.strip()).strip("-").lower()
+    if not slug:
+        slug = "item"
+    timestamp = int(now_utc().timestamp() * 1000)
+    return f"{slug}-{timestamp}"
 
 
 def verify_user_password(userid: str, password: str) -> bool:
@@ -384,14 +393,23 @@ def create_user_file():
 
     current_time = now_utc().isoformat()
     encrypted_content = encrypt_text(content)
+    file_name_value = legacy_file_name(title)
 
     with db_connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO user_files (userid, title, description, content_encrypted, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO user_files (userid, title, description, content_encrypted, file_name, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (userid, title, description, encrypted_content, current_time, current_time),
+            (
+                userid,
+                title,
+                description,
+                encrypted_content,
+                file_name_value,
+                current_time,
+                current_time,
+            ),
         )
         file_id = cursor.lastrowid
 

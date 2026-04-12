@@ -6,12 +6,17 @@
 	<title>CryptoSafe Registration</title>
 	<style>
 		:root {
-			--bg: #f4f7fb;
-			--panel: #ffffff;
-			--ink: #172033;
-			--accent: #0f766e;
-			--danger: #b42318;
-			--ring: rgba(15, 118, 110, 0.18);
+			--bg: #07111d;
+			--panel: rgba(11, 20, 34, 0.84);
+			--panel-border: rgba(110, 231, 183, 0.12);
+			--ink: #eff6ff;
+			--muted: #a6b4c2;
+			--accent: #6ee7b7;
+			--accent-2: #38bdf8;
+			--danger: #f43f5e;
+			--input-bg: rgba(255, 255, 255, 0.04);
+			--input-border: rgba(166, 180, 194, 0.25);
+			--chip: rgba(56, 189, 248, 0.12);
 		}
 
 		* {
@@ -22,35 +27,106 @@
 			margin: 0;
 			min-height: 100vh;
 			font-family: "Trebuchet MS", "Segoe UI", sans-serif;
-			background:
-				radial-gradient(circle at 10% 20%, rgba(153, 246, 228, 0.40), transparent 35%),
-				radial-gradient(circle at 90% 80%, rgba(15, 118, 110, 0.16), transparent 30%),
-				var(--bg);
 			color: var(--ink);
+			background:
+				radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.18), transparent 28%),
+				radial-gradient(circle at 85% 20%, rgba(110, 231, 183, 0.16), transparent 24%),
+				linear-gradient(160deg, #020814, #081627 50%, #050d18);
+			padding: 24px;
 			display: grid;
 			place-items: center;
-			padding: 20px;
 		}
 
+		.layout {
+			width: min(1180px, 100%);
+			display: grid;
+			grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+			gap: 20px;
+			align-items: center;
+		}
+
+		.hero,
 		.card {
-			width: 100%;
-			max-width: 460px;
 			background: var(--panel);
-			border: 1px solid rgba(15, 118, 110, 0.12);
-			border-radius: 18px;
-			box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
+			border: 1px solid var(--panel-border);
+			border-radius: 24px;
+			box-shadow: 0 22px 60px rgba(0, 0, 0, 0.32);
+			backdrop-filter: blur(14px);
+		}
+
+		.hero {
 			padding: 28px;
 		}
 
+		.eyebrow {
+			display: inline-flex;
+			align-items: center;
+			gap: 8px;
+			padding: 8px 12px;
+			border-radius: 999px;
+			background: rgba(7, 25, 38, 0.4);
+			border: 1px solid rgba(94, 234, 212, 0.22);
+			color: var(--accent);
+			font-size: 0.84rem;
+			font-weight: 700;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
+
 		h1 {
+			margin: 16px 0 10px;
+			font-size: clamp(2.3rem, 5vw, 4.4rem);
+			line-height: 0.98;
+			letter-spacing: -0.04em;
+		}
+
+		.lede {
+			max-width: 58ch;
+			margin: 0;
+			color: var(--muted);
+			font-size: 1.04rem;
+			line-height: 1.6;
+		}
+
+		.grid {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 14px;
+			margin-top: 22px;
+		}
+
+		.tile {
+			padding: 16px;
+			border-radius: 18px;
+			background: rgba(255, 255, 255, 0.04);
+			border: 1px solid rgba(166, 180, 194, 0.12);
+		}
+
+		.tile strong {
+			display: block;
+			margin-bottom: 6px;
+			font-size: 1rem;
+		}
+
+		.tile span {
+			color: var(--muted);
+			font-size: 0.88rem;
+			line-height: 1.45;
+		}
+
+		.card {
+			padding: 28px;
+		}
+
+		h2 {
 			margin: 0 0 8px;
-			font-size: 1.8rem;
-			letter-spacing: 0.02em;
+			font-size: 1.6rem;
 		}
 
 		p {
-			margin: 0 0 20px;
-			color: #40566f;
+			margin: 0 0 18px;
+			color: var(--muted);
+			line-height: 1.5;
 		}
 
 		label {
@@ -61,48 +137,49 @@
 		}
 
 		.field {
-			margin-bottom: 15px;
+			margin-bottom: 14px;
 		}
 
 		input {
 			width: 100%;
-			border: 1px solid #cbd5e1;
-			border-radius: 10px;
+			border: 1px solid var(--input-border);
+			border-radius: 12px;
 			padding: 12px 13px;
 			font: inherit;
 			color: var(--ink);
-			background: #ffffff;
+			background: var(--input-bg);
 			outline: none;
 			transition: border-color 0.2s ease, box-shadow 0.2s ease;
 		}
 
 		input:focus {
-			border-color: var(--accent);
-			box-shadow: 0 0 0 4px var(--ring);
+			border-color: rgba(110, 231, 183, 0.8);
+			box-shadow: 0 0 0 4px rgba(110, 231, 183, 0.12);
 		}
 
 		button {
 			width: 100%;
 			border: 0;
-			border-radius: 10px;
+			border-radius: 12px;
 			padding: 12px 14px;
 			font: inherit;
 			font-weight: 700;
-			color: #ffffff;
-			background: linear-gradient(135deg, var(--accent), #0a9396);
+			color: #02131f;
+			background: linear-gradient(135deg, var(--accent), var(--accent-2));
 			cursor: pointer;
 			transition: transform 0.15s ease, filter 0.15s ease;
 		}
 
 		button:hover {
-			filter: brightness(1.05);
 			transform: translateY(-1px);
+			filter: brightness(1.05);
 		}
 
 		.note {
 			margin-top: 14px;
 			font-size: 0.85rem;
-			color: #556b83;
+			color: var(--muted);
+			line-height: 1.45;
 		}
 
 		.status {
@@ -119,9 +196,8 @@
 		}
 
 		.status.error {
-			background: #fef3f2;
-			color: var(--danger);
-			border: 1px solid rgba(180, 35, 24, 0.16);
+			background: rgba(244, 63, 94, 0.18);
+			color: #fecdd3;
 		}
 
 		.links {
@@ -136,37 +212,70 @@
 			font-weight: 700;
 			color: var(--accent);
 		}
+
+		@media (max-width: 900px) {
+			.layout {
+				grid-template-columns: 1fr;
+			}
+
+			.hero {
+				padding-bottom: 8px;
+			}
+
+			.grid {
+				grid-template-columns: 1fr;
+			}
+		}
 	</style>
 </head>
 <body>
-	<main class="card">
-		<h1>Create Your CryptoSafe Account</h1>
-		<p>Register with a unique user ID and password.</p>
-		<div id="status" class="status"></div>
+	<div class="layout">
+		<section class="hero">
+			<div class="eyebrow">Secure access</div>
+			<h1>Create your CryptoSafe account.</h1>
+			<p class="lede">Use the same visual system as the dashboard so the app feels consistent from sign-up through vault management.</p>
 
-		<form action="/register" method="POST">
-			<div class="field">
-				<label for="userid">User ID</label>
-				<input id="userid" name="userid" type="text" minlength="3" maxlength="40" required />
+			<div class="grid">
+				<div class="tile">
+					<strong>Encrypted vault</strong>
+					<span>Your stored details are encrypted before being saved.</span>
+				</div>
+				<div class="tile">
+					<strong>Protected login</strong>
+					<span>Account access stays separate from saved folder content.</span>
+				</div>
 			</div>
+		</section>
 
-			<div class="field">
-				<label for="password">Password</label>
-				<input id="password" name="password" type="password" minlength="6" maxlength="128" required />
-			</div>
+		<main class="card">
+			<h2>Registration</h2>
+			<p>Register with a unique user ID and password.</p>
+			<div id="status" class="status"></div>
 
-			<div class="field">
-				<label for="confirm_password">Confirm Password</label>
-				<input id="confirm_password" name="confirm_password" type="password" minlength="6" maxlength="128" required />
-			</div>
+			<form action="/register" method="POST">
+				<div class="field">
+					<label for="userid">User ID</label>
+					<input id="userid" name="userid" type="text" minlength="3" maxlength="40" required />
+				</div>
 
-			<button type="submit">Create Account</button>
-			<p class="note">Passwords must match before the account is created. Passwords are securely hashed before being stored in the database.</p>
-			<div class="links">
-				<a href="/login.html">Already have an account? Login</a>
-			</div>
-		</form>
-	</main>
+				<div class="field">
+					<label for="password">Password</label>
+					<input id="password" name="password" type="password" minlength="6" maxlength="128" required />
+				</div>
+
+				<div class="field">
+					<label for="confirm_password">Confirm Password</label>
+					<input id="confirm_password" name="confirm_password" type="password" minlength="6" maxlength="128" required />
+				</div>
+
+				<button type="submit">Create Account</button>
+				<p class="note">Password confirmation is checked before account creation. Passwords are stored as hashes.</p>
+				<div class="links">
+					<a href="/login.html">Already have an account? Login</a>
+				</div>
+			</form>
+		</main>
+	</div>
 
 	<script>
 		const params = new URLSearchParams(window.location.search);
