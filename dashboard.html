@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CryptoSafe Dashboard</title>
+  <style>
+    :root {
+      --bg: #07111d;
+      --panel: rgba(11, 20, 34, 0.84);
+      --panel-border: rgba(110, 231, 183, 0.12);
+      --ink: #eff6ff;
+      --muted: #a6b4c2;
+      --accent: #6ee7b7;
+      --accent-2: #38bdf8;
+      --chip: rgba(56, 189, 248, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.18), transparent 28%),
+        radial-gradient(circle at 85% 20%, rgba(110, 231, 183, 0.16), transparent 24%),
+        linear-gradient(160deg, #020814, #081627 50%, #050d18);
+      padding: 24px;
+    }
+
+    .layout {
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 20px;
+      grid-template-columns: 1.15fr 0.85fr;
+      align-items: start;
+    }
+
+    .topbar {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 18px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(166, 180, 194, 0.12);
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .brand strong {
+      font-size: 1.08rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .brand span { color: var(--muted); font-size: 0.92rem; }
+
+    .logout {
+      color: #03111a;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      text-decoration: none;
+      font-weight: 700;
+      padding: 10px 14px;
+      border-radius: 12px;
+    }
+
+    .hero,
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 24px;
+      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.32);
+      backdrop-filter: blur(14px);
+    }
+
+    .hero {
+      padding: 28px;
+      min-height: 100%;
+    }
+
+    .hero h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 4vw, 3.9rem);
+      line-height: 1;
+      letter-spacing: -0.04em;
+    }
+
+    .hero p {
+      margin: 0;
+      max-width: 60ch;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 1.02rem;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 24px;
+    }
+
+    .stat {
+      padding: 18px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(166, 180, 194, 0.10);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 1.4rem;
+      margin-bottom: 8px;
+    }
+
+    .stat span { color: var(--muted); line-height: 1.45; }
+
+    .panel {
+      padding: 24px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-size: 1.25rem;
+    }
+
+    .chip {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--chip);
+      color: #b6ebff;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .vault-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .vault-card {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(166, 180, 194, 0.12);
+    }
+
+    .vault-card strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 1rem;
+    }
+
+    .vault-card span {
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 0.92rem;
+    }
+
+    .feature-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .feature {
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(166, 180, 194, 0.10);
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: 1fr; }
+      .topbar { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <header class="topbar">
+      <div class="brand">
+        <strong>CryptoSafe Vault</strong>
+        <span>Dashboard home for secure bank details and password records</span>
+      </div>
+      <a class="logout" href="/logout">Logout</a>
+    </header>
+
+    <section class="hero">
+      <div class="chip">Authenticated session</div>
+      <h1>Welcome to your secure dashboard.</h1>
+      <p>This home page is the central place to manage sensitive banking data, review saved passwords, and keep account activity under control.</p>
+
+      <div class="stats">
+        <div class="stat">
+          <strong>Secure</strong>
+          <span>Password hashes are stored instead of raw credentials.</span>
+        </div>
+        <div class="stat">
+          <strong>Locked</strong>
+          <span>Repeated failed logins trigger a 24-hour lockout.</span>
+        </div>
+        <div class="stat">
+          <strong>Private</strong>
+          <span>No public page exposes previous user records.</span>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="section-title">
+        <h2>Vault sections</h2>
+        <span class="chip">Overview</span>
+      </div>
+
+      <div class="vault-grid">
+        <div class="vault-card">
+          <strong>Bank Details</strong>
+          <span>Store account holder names, account numbers, and supporting notes in a controlled workspace.</span>
+        </div>
+        <div class="vault-card">
+          <strong>Password Manager</strong>
+          <span>Review saved credential entries and organize them by service, category, or priority.</span>
+        </div>
+        <div class="vault-card">
+          <strong>Security Actions</strong>
+          <span>Change your password, sign out safely, and manage future authentication policies from here.</span>
+        </div>
+      </div>
+
+      <div class="feature-list">
+        <div class="feature">Use this page as the main landing area after a successful login.</div>
+        <div class="feature">The page is protected by session checks on the backend.</div>
+      </div>
+    </aside>
+  </div>
+</body>
+</html>

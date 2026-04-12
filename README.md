@@ -7,9 +7,12 @@ This demo now uses Flask + SQLite for registration.
 ### Features
 - Register with `userid` and `password`
 - Password is hashed before storage (not plain text)[temporary hash algorithm only for demo not for deployment]
+- Duplicate user IDs are rejected on the registration page with an inline message
+- Login with session-based dashboard access
+- Accounts lock for 24 hours after 5 failed password attempts
 - Success/failure landing page after account creation
 - Retry option on failure
-- View stored records at `/users`
+- Dashboard home page after login
 
 ### Run Locally
 1. Create and activate a virtual environment (recommended).
@@ -18,4 +21,5 @@ This demo now uses Flask + SQLite for registration.
 3. Start the server:
 	`python app.py`
 4. Open:
-	`http://127.0.0.1:5000/registration.html
+	`http://127.0.0.1:5000/registration.html`
+	`http://127.0.0.1:5000/login.html`

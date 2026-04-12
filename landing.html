@@ -17,9 +17,7 @@
       --btn: #0b7285;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -47,14 +45,8 @@
     }
 
     @keyframes rise {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
     .badge {
@@ -131,19 +123,19 @@
       badge.style.background = "var(--ok-soft)";
       badge.style.color = "var(--ok)";
       title.textContent = "Account Created Successfully";
-      message.textContent = "Your CryptoSafe account has been created. You can now proceed to the next step.";
+      message.textContent = "Your CryptoSafe account has been created. You can now sign in with your new credentials.";
 
-      const viewUsersLink = document.createElement("a");
-      viewUsersLink.href = "/users";
-      viewUsersLink.className = "secondary";
-      viewUsersLink.textContent = "View Stored Users";
+      const loginLink = document.createElement("a");
+      loginLink.href = "/login.html";
+      loginLink.className = "primary";
+      loginLink.textContent = "Go to Login";
 
       const registerAgainLink = document.createElement("a");
       registerAgainLink.href = "/registration.html";
-      registerAgainLink.className = "primary";
+      registerAgainLink.className = "secondary";
       registerAgainLink.textContent = "Create Another Account";
 
-      actions.append(viewUsersLink, registerAgainLink);
+      actions.append(loginLink, registerAgainLink);
     } else {
       badge.textContent = "FAILED";
       badge.style.background = "var(--fail-soft)";

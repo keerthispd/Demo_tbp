@@ -6,13 +6,12 @@
 	<title>CryptoSafe Registration</title>
 	<style>
 		:root {
-			--bg: #f7f4ed;
-			--panel: #fffdf8;
-			--ink: #1f2a37;
-			--accent: #006d77;
-			--accent-soft: #83c5be;
-			--danger: #9b2226;
-			--ring: rgba(0, 109, 119, 0.25);
+			--bg: #f4f7fb;
+			--panel: #ffffff;
+			--ink: #172033;
+			--accent: #0f766e;
+			--danger: #b42318;
+			--ring: rgba(15, 118, 110, 0.18);
 		}
 
 		* {
@@ -24,8 +23,8 @@
 			min-height: 100vh;
 			font-family: "Trebuchet MS", "Segoe UI", sans-serif;
 			background:
-				radial-gradient(circle at 10% 20%, rgba(131, 197, 190, 0.25), transparent 35%),
-				radial-gradient(circle at 90% 80%, rgba(0, 109, 119, 0.18), transparent 30%),
+				radial-gradient(circle at 10% 20%, rgba(153, 246, 228, 0.40), transparent 35%),
+				radial-gradient(circle at 90% 80%, rgba(15, 118, 110, 0.16), transparent 30%),
 				var(--bg);
 			color: var(--ink);
 			display: grid;
@@ -37,7 +36,7 @@
 			width: 100%;
 			max-width: 460px;
 			background: var(--panel);
-			border: 1px solid rgba(0, 109, 119, 0.15);
+			border: 1px solid rgba(15, 118, 110, 0.12);
 			border-radius: 18px;
 			box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
 			padding: 28px;
@@ -106,8 +105,36 @@
 			color: #556b83;
 		}
 
-		.danger {
+		.status {
+			display: none;
+			padding: 12px 14px;
+			border-radius: 12px;
+			margin-bottom: 16px;
+			font-size: 0.95rem;
+			line-height: 1.45;
+		}
+
+		.status.show {
+			display: block;
+		}
+
+		.status.error {
+			background: #fef3f2;
 			color: var(--danger);
+			border: 1px solid rgba(180, 35, 24, 0.16);
+		}
+
+		.links {
+			display: flex;
+			gap: 10px;
+			flex-wrap: wrap;
+			margin-top: 14px;
+		}
+
+		.links a {
+			text-decoration: none;
+			font-weight: 700;
+			color: var(--accent);
 		}
 	</style>
 </head>
@@ -115,6 +142,7 @@
 	<main class="card">
 		<h1>Create Your CryptoSafe Account</h1>
 		<p>Register with a unique user ID and password.</p>
+		<div id="status" class="status"></div>
 
 		<form action="/register" method="POST">
 			<div class="field">
@@ -129,8 +157,21 @@
 
 			<button type="submit">Create Account</button>
 			<p class="note">Password is securely hashed before being stored in the database.</p>
-			
+			<div class="links">
+				<a href="/login.html">Already have an account? Login</a>
+			</div>
 		</form>
 	</main>
+
+	<script>
+		const params = new URLSearchParams(window.location.search);
+		const error = params.get("error");
+		const status = document.getElementById("status");
+
+		if (error) {
+			status.textContent = error;
+			status.className = "status show error";
+		}
+	</script>
 </body>
 </html>

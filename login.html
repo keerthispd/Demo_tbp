@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CryptoSafe Login</title>
+  <style>
+    :root {
+      --bg: #061826;
+      --panel: rgba(11, 30, 45, 0.88);
+      --panel-border: rgba(120, 198, 255, 0.15);
+      --ink: #e8f1f8;
+      --muted: #9cb6c7;
+      --accent: #5eead4;
+      --accent-2: #38bdf8;
+      --danger: #fda4af;
+      --danger-bg: rgba(190, 24, 93, 0.18);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      color: var(--ink);
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.25), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(94, 234, 212, 0.18), transparent 30%),
+        linear-gradient(160deg, #03111c, #091b2a 58%, #04131e);
+    }
+
+    .shell {
+      width: 100%;
+      max-width: 1100px;
+      display: grid;
+      gap: 22px;
+      grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+      align-items: center;
+    }
+
+    .hero {
+      padding: 18px 10px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(94, 234, 212, 0.22);
+      color: var(--accent);
+      background: rgba(7, 25, 38, 0.4);
+      font-size: 0.84rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 16px 0 10px;
+      font-size: clamp(2.3rem, 5vw, 4.6rem);
+      line-height: 0.98;
+      letter-spacing: -0.04em;
+    }
+
+    .lede {
+      max-width: 58ch;
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.6;
+    }
+
+    .panel {
+      width: 100%;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 22px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+      padding: 28px;
+      backdrop-filter: blur(14px);
+      animation: lift 0.5s ease both;
+    }
+
+    @keyframes lift {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .status {
+      display: none;
+      margin-bottom: 18px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      font-size: 0.95rem;
+      line-height: 1.45;
+    }
+
+    .status.show { display: block; }
+    .status.error { background: var(--danger-bg); color: var(--danger); }
+
+    label {
+      display: block;
+      margin-bottom: 7px;
+      font-weight: 700;
+      font-size: 0.94rem;
+    }
+
+    .field { margin-bottom: 16px; }
+
+    input {
+      width: 100%;
+      border: 1px solid rgba(156, 182, 199, 0.28);
+      border-radius: 12px;
+      padding: 13px 14px;
+      background: rgba(2, 12, 20, 0.45);
+      color: var(--ink);
+      font: inherit;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    input:focus {
+      border-color: rgba(94, 234, 212, 0.8);
+      box-shadow: 0 0 0 4px rgba(94, 234, 212, 0.14);
+    }
+
+    button,
+    .link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 0 16px;
+      border-radius: 12px;
+      text-decoration: none;
+      font: inherit;
+      font-weight: 700;
+      transition: transform 0.15s ease, filter 0.15s ease, background 0.15s ease;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      color: #02131f;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      cursor: pointer;
+    }
+
+    button:hover,
+    .link:hover { transform: translateY(-1px); filter: brightness(1.05); }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+
+    .link {
+      border: 1px solid rgba(156, 182, 199, 0.22);
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .hint {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+      margin-top: 22px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .tile {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(156, 182, 199, 0.12);
+    }
+
+    .tile strong { display: block; margin-bottom: 6px; font-size: 1rem; }
+    .tile span { color: var(--muted); font-size: 0.88rem; line-height: 1.45; }
+
+    @media (max-width: 900px) {
+      .shell { grid-template-columns: 1fr; }
+      .hero { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="eyebrow">Secure access</div>
+      <h1>Sign in to your CryptoSafe dashboard.</h1>
+      <p class="lede">Access your secure bank details and password vault from a single dashboard. Wrong password attempts are tracked and the account is locked for 24 hours after repeated failures.</p>
+
+      <div class="grid">
+        <div class="tile">
+          <strong>Encrypted storage</strong>
+          <span>Passwords are hashed before they are saved in the database.</span>
+        </div>
+        <div class="tile">
+          <strong>Account safety</strong>
+          <span>Repeated failed logins trigger a temporary lockout to protect the account.</span>
+        </div>
+      </div>
+    </section>
+
+    <main class="panel">
+      <div id="status" class="status"></div>
+      <form action="/login" method="POST">
+        <div class="field">
+          <label for="userid">User ID</label>
+          <input id="userid" name="userid" type="text" minlength="3" maxlength="40" required />
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" minlength="6" maxlength="128" required />
+        </div>
+
+        <button type="submit">Login</button>
+      </form>
+
+      <div class="actions">
+        <a class="link" href="/registration.html">Create account</a>
+      </div>
+
+      <p class="hint">After 5 failed password attempts, the account is locked for 24 hours.</p>
+    </main>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get("error");
+    const status = document.getElementById("status");
+
+    if (error) {
+      status.textContent = error;
+      status.className = "status show error";
+    }
+  </script>
+</body>
+</html>
