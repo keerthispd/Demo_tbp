@@ -6,15 +6,18 @@
   <title>Registration Result</title>
   <style>
     :root {
-      --bg: #f1f5f9;
-      --card: #ffffff;
-      --ok: #1d6f42;
-      --ok-soft: #e9f8ef;
-      --fail: #8b1e3f;
-      --fail-soft: #fceef2;
-      --ink: #243447;
-      --muted: #52677d;
-      --btn: #0b7285;
+      --bg: #07111d;
+      --panel: rgba(11, 20, 34, 0.84);
+      --panel-border: rgba(110, 231, 183, 0.12);
+      --ink: #eff6ff;
+      --muted: #a6b4c2;
+      --accent: #6ee7b7;
+      --accent-2: #38bdf8;
+      --ok: #34d399;
+      --ok-soft: rgba(52, 211, 153, 0.15);
+      --fail: #f43f5e;
+      --fail-soft: rgba(244, 63, 94, 0.18);
+      --chip: rgba(56, 189, 248, 0.12);
     }
 
     * { box-sizing: border-box; }
@@ -24,29 +27,94 @@
       min-height: 100vh;
       display: grid;
       place-items: center;
-      padding: 20px;
-      background:
-        linear-gradient(160deg, rgba(11, 114, 133, 0.1), transparent 35%),
-        linear-gradient(330deg, rgba(29, 111, 66, 0.12), transparent 45%),
-        var(--bg);
-      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      padding: 24px;
       color: var(--ink);
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.18), transparent 28%),
+        radial-gradient(circle at 85% 20%, rgba(110, 231, 183, 0.16), transparent 24%),
+        linear-gradient(160deg, #020814, #081627 50%, #050d18);
+    }
+
+    .shell {
+      width: min(1180px, 100%);
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+      gap: 20px;
+      align-items: center;
+    }
+
+    .hero,
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 24px;
+      box-shadow: 0 22px 60px rgba(0, 0, 0, 0.32);
+      backdrop-filter: blur(14px);
+    }
+
+    .hero {
+      padding: 28px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(7, 25, 38, 0.4);
+      border: 1px solid rgba(94, 234, 212, 0.22);
+      color: var(--accent);
+      font-size: 0.84rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 16px 0 10px;
+      font-size: clamp(2.2rem, 4.8vw, 4.3rem);
+      line-height: 0.98;
+      letter-spacing: -0.04em;
+    }
+
+    .lede {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 1.04rem;
+      max-width: 58ch;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 22px;
+    }
+
+    .tile {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(166, 180, 194, 0.12);
+    }
+
+    .tile strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 1rem;
+    }
+
+    .tile span {
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.45;
     }
 
     .panel {
-      width: 100%;
-      max-width: 540px;
-      background: var(--card);
-      border-radius: 16px;
-      border: 1px solid rgba(36, 52, 71, 0.1);
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
-      padding: 26px;
-      animation: rise 0.5s ease;
-    }
-
-    @keyframes rise {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+      padding: 28px;
     }
 
     .badge {
@@ -56,11 +124,8 @@
       border-radius: 999px;
       margin-bottom: 14px;
       font-size: 0.85rem;
-    }
-
-    h1 {
-      margin: 0 0 10px;
-      font-size: 1.7rem;
+      background: var(--chip);
+      color: #b6ebff;
     }
 
     p {
@@ -77,7 +142,7 @@
 
     a {
       text-decoration: none;
-      border-radius: 10px;
+      border-radius: 12px;
       padding: 11px 14px;
       font-weight: 700;
       transition: transform 0.15s ease, filter 0.15s ease;
@@ -85,28 +150,52 @@
 
     a:hover {
       transform: translateY(-1px);
-      filter: brightness(1.04);
+      filter: brightness(1.05);
     }
 
     .primary {
-      background: var(--btn);
-      color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #02131f;
     }
 
     .secondary {
-      border: 1px solid rgba(36, 52, 71, 0.2);
+      background: rgba(255, 255, 255, 0.04);
       color: var(--ink);
-      background: #fff;
+      border: 1px solid rgba(166, 180, 194, 0.2);
+    }
+
+    @media (max-width: 900px) {
+      .shell { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
-  <main class="panel">
-    <div id="badge" class="badge"></div>
-    <h1 id="title"></h1>
-    <p id="message"></p>
-    <div class="actions" id="actions"></div>
-  </main>
+  <div class="shell">
+    <section class="hero">
+      <div class="eyebrow">Account status</div>
+      <h1>Registration result</h1>
+      <p class="lede">The result page now matches the rest of the app so navigation feels consistent across signup, login, and vault screens.</p>
+
+      <div class="grid">
+        <div class="tile">
+          <strong>Unified theme</strong>
+          <span>Same dark glass look as the dashboard and login screens.</span>
+        </div>
+        <div class="tile">
+          <strong>Clear next step</strong>
+          <span>Go straight to login after a successful account creation.</span>
+        </div>
+      </div>
+    </section>
+
+    <main class="panel">
+      <div id="badge" class="badge"></div>
+      <h1 id="title"></h1>
+      <p id="message"></p>
+      <div class="actions" id="actions"></div>
+    </main>
+  </div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
