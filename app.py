@@ -16,6 +16,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "cryptosafe.db"
+USER_FILES_DIR = BASE_DIR / "vault_files"
 LOCKOUT_DURATION = timedelta(hours=24)
 MAX_FAILED_ATTEMPTS = 3
 
@@ -61,6 +62,8 @@ def decrypt_text(encoded_text: str) -> str:
 
 
 def init_db() -> None:
+    USER_FILES_DIR.mkdir(parents=True, exist_ok=True)
+
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """
@@ -106,6 +109,8 @@ def init_db() -> None:
         file_columns = {
             row[1] for row in conn.execute("PRAGMA table_info(user_files)").fetchall()
         }
+        if "file_name" not in file_columns:
+            conn.execute("ALTER TABLE user_files ADD COLUMN file_name TEXT NOT NULL DEFAULT ''")
         if "description" not in file_columns:
             conn.execute("ALTER TABLE user_files ADD COLUMN description TEXT NOT NULL DEFAULT ''")
         if "content_encrypted" not in file_columns:
@@ -164,6 +169,23 @@ def legacy_file_name(title: str) -> str:
         slug = "item"
     timestamp = int(now_utc().timestamp() * 1000)
     return f"{slug}-{timestamp}"
+
+
+def user_folder(userid: str) -> Path:
+    folder = USER_FILES_DIR / userid
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def storage_relpath_for_title(userid: str, title: str, file_id: int) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", title.strip()).strip("-").lower()
+    if not slug:
+        slug = "item"
+    return f"{userid}/{slug}-{file_id}.enc"
+
+
+def storage_abspath_from_relpath(relpath: str) -> Path:
+    return USER_FILES_DIR / relpath
 
 
 def verify_user_password(userid: str, password: str) -> bool:
@@ -393,8 +415,6 @@ def create_user_file():
 
     current_time = now_utc().isoformat()
     encrypted_content = encrypt_text(content)
-    file_name_value = legacy_file_name(title)
-
     with db_connection() as conn:
         cursor = conn.execute(
             """
@@ -406,12 +426,22 @@ def create_user_file():
                 title,
                 description,
                 encrypted_content,
-                file_name_value,
+                "",
                 current_time,
                 current_time,
             ),
         )
         file_id = cursor.lastrowid
+
+        relpath = storage_relpath_for_title(userid, title, file_id)
+        conn.execute(
+            "UPDATE user_files SET file_name = ? WHERE id = ? AND userid = ?",
+            (relpath, file_id, userid),
+        )
+
+    target_path = storage_abspath_from_relpath(relpath)
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    target_path.write_text(encrypted_content, encoding="utf-8")
 
     return jsonify({"id": file_id, "message": "File created successfully."}), 201
 
@@ -432,7 +462,7 @@ def display_user_file(file_id: int):
     with db_connection() as conn:
         row = conn.execute(
             """
-            SELECT id, title, description, content_encrypted, created_at, updated_at
+            SELECT id, title, description, content_encrypted, file_name, created_at, updated_at
             FROM user_files
             WHERE id = ? AND userid = ?
             """,
@@ -443,7 +473,13 @@ def display_user_file(file_id: int):
         return jsonify({"error": "File not found."}), 404
 
     try:
-        content = decrypt_text(row["content_encrypted"]) if row["content_encrypted"] else ""
+        encrypted_payload = row["content_encrypted"] or ""
+        if row["file_name"]:
+            file_path = storage_abspath_from_relpath(row["file_name"])
+            if file_path.exists():
+                encrypted_payload = file_path.read_text(encoding="utf-8")
+
+        content = decrypt_text(encrypted_payload) if encrypted_payload else ""
     except Exception:
         return jsonify({"error": "Unable to decrypt stored content."}), 500
 
@@ -483,11 +519,13 @@ def update_user_file(file_id: int):
 
     with db_connection() as conn:
         row = conn.execute(
-            "SELECT id FROM user_files WHERE id = ? AND userid = ?",
+            "SELECT id, file_name FROM user_files WHERE id = ? AND userid = ?",
             (file_id, userid),
         ).fetchone()
         if row is None:
             return jsonify({"error": "File not found."}), 404
+
+        new_relpath = storage_relpath_for_title(userid, title, file_id)
 
         conn.execute(
             """
@@ -495,11 +533,22 @@ def update_user_file(file_id: int):
             SET title = ?,
                 description = ?,
                 content_encrypted = ?,
+                file_name = ?,
                 updated_at = ?
             WHERE id = ? AND userid = ?
             """,
-            (title, description, encrypted_content, updated_at, file_id, userid),
+            (title, description, encrypted_content, new_relpath, updated_at, file_id, userid),
         )
+
+    new_path = storage_abspath_from_relpath(new_relpath)
+    new_path.parent.mkdir(parents=True, exist_ok=True)
+    new_path.write_text(encrypted_content, encoding="utf-8")
+
+    old_relpath = row["file_name"] or ""
+    if old_relpath and old_relpath != new_relpath:
+        old_path = storage_abspath_from_relpath(old_relpath)
+        if old_path.exists():
+            old_path.unlink()
 
     return jsonify({"message": "File updated successfully."})
 
@@ -520,7 +569,7 @@ def delete_user_file(file_id: int):
 
     with db_connection() as conn:
         row = conn.execute(
-            "SELECT id FROM user_files WHERE id = ? AND userid = ?",
+            "SELECT id, file_name FROM user_files WHERE id = ? AND userid = ?",
             (file_id, userid),
         ).fetchone()
         if row is None:
@@ -530,6 +579,12 @@ def delete_user_file(file_id: int):
             "DELETE FROM user_files WHERE id = ? AND userid = ?",
             (file_id, userid),
         )
+
+    relpath = row["file_name"] or ""
+    if relpath:
+        target_path = storage_abspath_from_relpath(relpath)
+        if target_path.exists():
+            target_path.unlink()
 
     return jsonify({"message": "File deleted successfully."})
 
