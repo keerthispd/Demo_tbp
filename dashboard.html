@@ -13,7 +13,11 @@
       --muted: #a6b4c2;
       --accent: #6ee7b7;
       --accent-2: #38bdf8;
+      --danger: #f43f5e;
+      --ok: #34d399;
       --chip: rgba(56, 189, 248, 0.12);
+      --input-bg: rgba(255, 255, 255, 0.04);
+      --input-border: rgba(166, 180, 194, 0.25);
     }
 
     * { box-sizing: border-box; }
@@ -31,11 +35,11 @@
     }
 
     .layout {
-      width: min(1180px, 100%);
+      width: min(1220px, 100%);
       margin: 0 auto;
       display: grid;
       gap: 20px;
-      grid-template-columns: 1.15fr 0.85fr;
+      grid-template-columns: 1.1fr 0.9fr;
       align-items: start;
     }
 
@@ -74,72 +78,113 @@
       border-radius: 12px;
     }
 
-    .hero,
     .panel {
       background: var(--panel);
       border: 1px solid var(--panel-border);
       border-radius: 24px;
       box-shadow: 0 22px 60px rgba(0, 0, 0, 0.32);
       backdrop-filter: blur(14px);
-    }
-
-    .hero {
-      padding: 28px;
-      min-height: 100%;
-    }
-
-    .hero h1 {
-      margin: 0 0 10px;
-      font-size: clamp(2rem, 4vw, 3.9rem);
-      line-height: 1;
-      letter-spacing: -0.04em;
-    }
-
-    .hero p {
-      margin: 0;
-      max-width: 60ch;
-      color: var(--muted);
-      line-height: 1.6;
-      font-size: 1.02rem;
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 14px;
-      margin-top: 24px;
-    }
-
-    .stat {
-      padding: 18px;
-      border-radius: 18px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(166, 180, 194, 0.10);
-    }
-
-    .stat strong {
-      display: block;
-      font-size: 1.4rem;
-      margin-bottom: 8px;
-    }
-
-    .stat span { color: var(--muted); line-height: 1.45; }
-
-    .panel {
       padding: 24px;
     }
 
-    .section-title {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 18px;
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 1.4rem;
+      letter-spacing: 0.01em;
     }
 
-    .section-title h2 {
-      margin: 0;
-      font-size: 1.25rem;
+    .panel .sub {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+
+    .status {
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 0.92rem;
+      display: none;
+    }
+
+    .status.show { display: block; }
+    .status.ok { background: rgba(52, 211, 153, 0.15); color: #a7f3d0; }
+    .status.error { background: rgba(244, 63, 94, 0.18); color: #fecdd3; }
+
+    label {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .field { margin-bottom: 14px; }
+
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--input-border);
+      border-radius: 12px;
+      padding: 11px 12px;
+      background: var(--input-bg);
+      color: var(--ink);
+      font: inherit;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    textarea {
+      min-height: 130px;
+      resize: vertical;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: rgba(110, 231, 183, 0.8);
+      box-shadow: 0 0 0 4px rgba(110, 231, 183, 0.12);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: #02131f;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease, filter 0.15s ease;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    }
+
+    button.alt {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--ink);
+      border: 1px solid rgba(166, 180, 194, 0.2);
+    }
+
+    button.warn {
+      background: linear-gradient(135deg, #fb7185, #f43f5e);
+      color: white;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+
+    .files-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
     }
 
     .chip {
@@ -151,48 +196,68 @@
       font-weight: 700;
     }
 
-    .vault-grid {
+    .file-list {
       display: grid;
-      gap: 14px;
+      gap: 10px;
+      margin-bottom: 16px;
     }
 
-    .vault-card {
-      padding: 16px;
-      border-radius: 18px;
+    .file-card {
+      padding: 12px;
+      border-radius: 14px;
       background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(166, 180, 194, 0.12);
+      border: 1px solid rgba(166, 180, 194, 0.14);
     }
 
-    .vault-card strong {
+    .file-card strong {
       display: block;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       font-size: 1rem;
     }
 
-    .vault-card span {
+    .file-desc {
+      color: #d1e4f3;
+      font-size: 0.88rem;
+      margin-bottom: 8px;
+      line-height: 1.4;
+      opacity: 0.88;
+    }
+
+    .file-card small {
+      display: block;
       color: var(--muted);
-      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+
+    .empty {
+      color: var(--muted);
       font-size: 0.92rem;
+      border: 1px dashed rgba(166, 180, 194, 0.2);
+      border-radius: 12px;
+      padding: 14px;
     }
 
-    .feature-list {
-      display: grid;
-      gap: 12px;
-      margin-top: 16px;
-    }
-
-    .feature {
-      padding: 14px 16px;
-      border-radius: 16px;
+    .viewer,
+    .editor {
+      margin-top: 12px;
+      padding: 14px;
+      border-radius: 14px;
       background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(166, 180, 194, 0.10);
-      color: var(--muted);
-      line-height: 1.5;
+      border: 1px solid rgba(166, 180, 194, 0.14);
     }
 
-    @media (max-width: 900px) {
+    .viewer textarea {
+      min-height: 160px;
+    }
+
+    .meta {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    @media (max-width: 950px) {
       .layout { grid-template-columns: 1fr; }
-      .stats { grid-template-columns: 1fr; }
       .topbar { flex-direction: column; align-items: flex-start; }
     }
   </style>
@@ -202,58 +267,353 @@
     <header class="topbar">
       <div class="brand">
         <strong>CryptoSafe Vault</strong>
-        <span>Dashboard home for secure bank details and password records</span>
+        <span>Account credentials are stored separately from encrypted folder details</span>
       </div>
       <a class="logout" href="/logout">Logout</a>
     </header>
 
-    <section class="hero">
-      <div class="chip">Authenticated session</div>
-      <h1>Welcome to your secure dashboard.</h1>
-      <p>This home page is the central place to manage sensitive banking data, review saved passwords, and keep account activity under control.</p>
+    <section class="panel">
+      <h2>Create File</h2>
+      <p class="sub">Create a folder item with title, short description, and encrypted details content.</p>
+      <div id="createStatus" class="status"></div>
 
-      <div class="stats">
-        <div class="stat">
-          <strong>Secure</strong>
-          <span>Password hashes are stored instead of raw credentials.</span>
+      <form id="createForm">
+        <div class="field">
+          <label for="newTitle">Title</label>
+          <input id="newTitle" name="title" type="text" maxlength="120" required />
         </div>
-        <div class="stat">
-          <strong>Locked</strong>
-          <span>Repeated failed logins trigger a 24-hour lockout.</span>
+
+        <div class="field">
+          <label for="newDescription">Short Description</label>
+          <input id="newDescription" name="description" type="text" maxlength="180" placeholder="e.g., Primary bank account credentials" />
         </div>
-        <div class="stat">
-          <strong>Private</strong>
-          <span>No public page exposes previous user records.</span>
+
+        <div class="field">
+          <label for="newContent">Details (passwords, bank details, notes)</label>
+          <textarea id="newContent" name="content" required></textarea>
         </div>
+
+        <div class="btn-row">
+          <button type="submit">Create file</button>
+          <button type="button" class="alt" id="clearCreate">Clear</button>
+        </div>
+      </form>
+
+      <div class="viewer" id="viewer">
+        <h2 style="margin-top:0; font-size:1.1rem;">Display File Content</h2>
+        <p class="sub" style="margin-bottom:10px;">Display requires your account password confirmation.</p>
+        <div id="viewStatus" class="status"></div>
+        <div class="field">
+          <label for="viewTitle">Title</label>
+          <input id="viewTitle" type="text" readonly />
+        </div>
+        <div class="field">
+          <label for="viewDescription">Short Description</label>
+          <input id="viewDescription" type="text" readonly />
+        </div>
+        <div class="field">
+          <label for="viewContent">Details</label>
+          <textarea id="viewContent" readonly></textarea>
+        </div>
+        <div class="meta" id="viewMeta"></div>
       </div>
     </section>
 
     <aside class="panel">
-      <div class="section-title">
-        <h2>Vault sections</h2>
-        <span class="chip">Overview</span>
+      <div class="files-header">
+        <h2 style="margin:0;">Folder Files</h2>
+        <span class="chip" id="fileCount">0 files</span>
       </div>
+      <p class="sub">Display, update, and delete work only after account password confirmation.</p>
+      <div id="listStatus" class="status"></div>
+      <div id="fileList" class="file-list"></div>
 
-      <div class="vault-grid">
-        <div class="vault-card">
-          <strong>Bank Details</strong>
-          <span>Store account holder names, account numbers, and supporting notes in a controlled workspace.</span>
+      <div class="editor" id="editor" style="display:none;">
+        <h2 style="margin-top:0; font-size:1.1rem;">Update File</h2>
+        <div id="editStatus" class="status"></div>
+        <input type="hidden" id="editFileId" />
+        <div class="field">
+          <label for="editTitle">Title</label>
+          <input id="editTitle" type="text" maxlength="120" required />
         </div>
-        <div class="vault-card">
-          <strong>Password Manager</strong>
-          <span>Review saved credential entries and organize them by service, category, or priority.</span>
+        <div class="field">
+          <label for="editDescription">Short Description</label>
+          <input id="editDescription" type="text" maxlength="180" />
         </div>
-        <div class="vault-card">
-          <strong>Security Actions</strong>
-          <span>Change your password, sign out safely, and manage future authentication policies from here.</span>
+        <div class="field">
+          <label for="editContent">Details</label>
+          <textarea id="editContent" required></textarea>
         </div>
-      </div>
-
-      <div class="feature-list">
-        <div class="feature">Use this page as the main landing area after a successful login.</div>
-        <div class="feature">The page is protected by session checks on the backend.</div>
+        <div class="field">
+          <label for="editPassword">Confirm account password</label>
+          <input id="editPassword" type="password" required />
+        </div>
+        <div class="btn-row">
+          <button type="button" id="saveUpdate">Update file</button>
+          <button type="button" class="alt" id="cancelEdit">Cancel</button>
+        </div>
       </div>
     </aside>
   </div>
+
+  <script>
+    const createForm = document.getElementById("createForm");
+    const createStatus = document.getElementById("createStatus");
+    const listStatus = document.getElementById("listStatus");
+    const viewStatus = document.getElementById("viewStatus");
+    const editStatus = document.getElementById("editStatus");
+    const fileList = document.getElementById("fileList");
+    const fileCount = document.getElementById("fileCount");
+    const clearCreate = document.getElementById("clearCreate");
+
+    const viewTitle = document.getElementById("viewTitle");
+    const viewDescription = document.getElementById("viewDescription");
+    const viewContent = document.getElementById("viewContent");
+    const viewMeta = document.getElementById("viewMeta");
+
+    const editor = document.getElementById("editor");
+    const editFileId = document.getElementById("editFileId");
+    const editTitle = document.getElementById("editTitle");
+    const editDescription = document.getElementById("editDescription");
+    const editContent = document.getElementById("editContent");
+    const editPassword = document.getElementById("editPassword");
+    const saveUpdate = document.getElementById("saveUpdate");
+    const cancelEdit = document.getElementById("cancelEdit");
+
+    function showStatus(node, message, kind) {
+      node.textContent = message;
+      node.className = `status show ${kind}`;
+    }
+
+    function clearStatus(node) {
+      node.textContent = "";
+      node.className = "status";
+    }
+
+    async function apiRequest(url, options = {}) {
+      const response = await fetch(url, {
+        headers: { "Content-Type": "application/json" },
+        ...options,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Request failed.");
+      }
+      return data;
+    }
+
+    function renderFiles(files) {
+      fileList.innerHTML = "";
+      fileCount.textContent = `${files.length} file${files.length === 1 ? "" : "s"}`;
+
+      if (!files.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "No files yet. Create your first file from the left panel.";
+        fileList.appendChild(empty);
+        return;
+      }
+
+      files.forEach((file) => {
+        const card = document.createElement("div");
+        card.className = "file-card";
+
+        const title = document.createElement("strong");
+        title.textContent = file.title;
+
+        const desc = document.createElement("div");
+        desc.className = "file-desc";
+        desc.textContent = file.description || "No description provided.";
+
+        const meta = document.createElement("small");
+        meta.textContent = `Created: ${new Date(file.created_at).toLocaleString()} | Updated: ${new Date(file.updated_at).toLocaleString()}`;
+
+        const actions = document.createElement("div");
+        actions.className = "btn-row";
+
+        const displayBtn = document.createElement("button");
+        displayBtn.type = "button";
+        displayBtn.textContent = "Display";
+        displayBtn.className = "alt";
+        displayBtn.onclick = () => displayFile(file.id);
+
+        const updateBtn = document.createElement("button");
+        updateBtn.type = "button";
+        updateBtn.textContent = "Update";
+        updateBtn.onclick = () => beginEdit(file.id, file.title);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.className = "warn";
+        deleteBtn.onclick = () => deleteFile(file.id, file.title);
+
+        actions.append(displayBtn, updateBtn, deleteBtn);
+        card.append(title, desc, meta, actions);
+        fileList.appendChild(card);
+      });
+    }
+
+    async function loadFiles() {
+      clearStatus(listStatus);
+      try {
+        const data = await apiRequest("/api/files");
+        renderFiles(data.files || []);
+      } catch (error) {
+        showStatus(listStatus, error.message, "error");
+      }
+    }
+
+    async function displayFile(fileId) {
+      clearStatus(viewStatus);
+      const password = prompt("Confirm your account password to display this file:");
+      if (!password) {
+        showStatus(viewStatus, "Display cancelled. Password confirmation required.", "error");
+        return;
+      }
+
+      try {
+        const data = await apiRequest(`/api/files/${fileId}/display`, {
+          method: "POST",
+          body: JSON.stringify({ password }),
+        });
+        viewTitle.value = data.title || "";
+        viewDescription.value = data.description || "";
+        viewContent.value = data.content || "";
+        viewMeta.textContent = `Created: ${new Date(data.created_at).toLocaleString()} | Updated: ${new Date(data.updated_at).toLocaleString()}`;
+        showStatus(viewStatus, "File displayed successfully.", "ok");
+      } catch (error) {
+        showStatus(viewStatus, error.message, "error");
+      }
+    }
+
+    async function beginEdit(fileId, fallbackTitle) {
+      clearStatus(editStatus);
+      const password = prompt("Confirm your account password to load this file for update:");
+      if (!password) {
+        showStatus(editStatus, "Update cancelled. Password confirmation required.", "error");
+        editor.style.display = "block";
+        return;
+      }
+
+      try {
+        const data = await apiRequest(`/api/files/${fileId}/display`, {
+          method: "POST",
+          body: JSON.stringify({ password }),
+        });
+        editFileId.value = String(fileId);
+        editTitle.value = data.title || fallbackTitle || "";
+        editDescription.value = data.description || "";
+        editContent.value = data.content || "";
+        editPassword.value = "";
+        editor.style.display = "block";
+        showStatus(editStatus, "File loaded. Enter password again to confirm update.", "ok");
+      } catch (error) {
+        editor.style.display = "block";
+        showStatus(editStatus, error.message, "error");
+      }
+    }
+
+    async function deleteFile(fileId, title) {
+      clearStatus(listStatus);
+      const confirmed = confirm(`Delete file \"${title}\"?`);
+      if (!confirmed) {
+        return;
+      }
+
+      const password = prompt("Confirm your account password to delete this file:");
+      if (!password) {
+        showStatus(listStatus, "Delete cancelled. Password confirmation required.", "error");
+        return;
+      }
+
+      try {
+        await apiRequest(`/api/files/${fileId}/delete`, {
+          method: "POST",
+          body: JSON.stringify({ password }),
+        });
+        showStatus(listStatus, "File deleted successfully.", "ok");
+        await loadFiles();
+      } catch (error) {
+        showStatus(listStatus, error.message, "error");
+      }
+    }
+
+    createForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      clearStatus(createStatus);
+
+      const title = document.getElementById("newTitle").value.trim();
+      const description = document.getElementById("newDescription").value.trim();
+      const content = document.getElementById("newContent").value;
+      if (!title || !content.trim()) {
+        showStatus(createStatus, "Title and content are required.", "error");
+        return;
+      }
+
+      try {
+        await apiRequest("/api/files", {
+          method: "POST",
+          body: JSON.stringify({ title, description, content }),
+        });
+        showStatus(createStatus, "File created successfully.", "ok");
+        createForm.reset();
+        await loadFiles();
+      } catch (error) {
+        showStatus(createStatus, error.message, "error");
+      }
+    });
+
+    clearCreate.addEventListener("click", () => {
+      createForm.reset();
+      clearStatus(createStatus);
+    });
+
+    saveUpdate.addEventListener("click", async () => {
+      clearStatus(editStatus);
+      const fileId = editFileId.value;
+      const title = editTitle.value.trim();
+      const description = editDescription.value.trim();
+      const content = editContent.value;
+      const password = editPassword.value;
+
+      if (!fileId) {
+        showStatus(editStatus, "Select a file first.", "error");
+        return;
+      }
+      if (!title) {
+        showStatus(editStatus, "Title is required.", "error");
+        return;
+      }
+      if (!password) {
+        showStatus(editStatus, "Password confirmation is required for update.", "error");
+        return;
+      }
+
+      try {
+        await apiRequest(`/api/files/${fileId}/update`, {
+          method: "POST",
+          body: JSON.stringify({ title, description, content, password }),
+        });
+        showStatus(editStatus, "File updated successfully.", "ok");
+        editPassword.value = "";
+        await loadFiles();
+      } catch (error) {
+        showStatus(editStatus, error.message, "error");
+      }
+    });
+
+    cancelEdit.addEventListener("click", () => {
+      editor.style.display = "none";
+      editFileId.value = "";
+      editTitle.value = "";
+      editDescription.value = "";
+      editContent.value = "";
+      editPassword.value = "";
+      clearStatus(editStatus);
+    });
+
+    loadFiles();
+  </script>
 </body>
 </html>
