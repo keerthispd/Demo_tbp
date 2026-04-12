@@ -128,9 +128,13 @@ def logout():
 def register_user():
     userid = (request.form.get("userid") or "").strip()
     password = request.form.get("password") or ""
+    confirm_password = request.form.get("confirm_password") or ""
 
     if not userid or not password:
         return redirect(build_registration_url("User ID and password are required."))
+
+    if password != confirm_password:
+        return redirect(build_registration_url("Passwords do not match."))
 
     if len(userid) < 3 or len(password) < 6:
         return redirect(
