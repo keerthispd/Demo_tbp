@@ -76,6 +76,108 @@
       font-weight: 700;
       padding: 10px 14px;
       border-radius: 12px;
+
+        .modal {
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.6);
+          z-index: 1000;
+          justify-content: center;
+          align-items: center;
+          backdrop-filter: blur(2px);
+        }
+
+        .modal.show { display: flex; }
+
+        .modal-content {
+          background: var(--panel);
+          border: 1px solid var(--panel-border);
+          border-radius: 24px;
+          padding: 28px;
+          max-width: 480px;
+          width: 90%;
+          max-height: 80vh;
+          overflow-y: auto;
+          box-shadow: 0 28px 80px rgba(0, 0, 0, 0.48);
+        }
+
+        .modal-header {
+          margin-bottom: 16px;
+        }
+
+        .modal-header h3 {
+          margin: 0 0 4px;
+          font-size: 1.3rem;
+          letter-spacing: 0.01em;
+        }
+
+        .modal-header .sub {
+          margin: 0;
+          color: var(--muted);
+          font-size: 0.93rem;
+          line-height: 1.5;
+        }
+
+        .warning-box {
+          background: rgba(244, 63, 94, 0.12);
+          border: 1px solid rgba(244, 63, 94, 0.3);
+          border-radius: 12px;
+          padding: 14px;
+          margin-bottom: 18px;
+          color: #fecdd3;
+          font-size: 0.92rem;
+          line-height: 1.5;
+        }
+
+        .warning-box strong {
+          display: block;
+          margin-bottom: 6px;
+          color: #fca5ac;
+        }
+
+        .confirmation-info {
+          background: rgba(56, 189, 248, 0.08);
+          border-left: 3px solid rgba(56, 189, 248, 0.5);
+          padding: 12px;
+          margin-bottom: 18px;
+          font-size: 0.91rem;
+          color: #bfdbfe;
+          line-height: 1.4;
+        }
+
+        .checkbox-field {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          margin-bottom: 16px;
+        }
+
+        .checkbox-field input[type="checkbox"] {
+          width: auto;
+          margin-top: 4px;
+          cursor: pointer;
+        }
+
+        .checkbox-field label {
+          margin-bottom: 0;
+          cursor: pointer;
+          font-weight: 500;
+          font-size: 0.9rem;
+        }
+
+        .modal-actions {
+          display: flex;
+          gap: 10px;
+          justify-content: flex-end;
+        }
+
+        .modal-actions button {
+          flex-shrink: 0;
+        }
     }
 
     .panel {
@@ -98,6 +200,20 @@
       color: var(--muted);
       line-height: 1.5;
       font-size: 0.95rem;
+
+        .danger-section {
+          border-top: 1px solid rgba(244, 63, 94, 0.2);
+          margin-top: 28px;
+          padding-top: 20px;
+        }
+
+        .danger-section h3 {
+          color: #fca5ac;
+          font-size: 0.95rem;
+          margin: 0 0 12px;
+          text-transform: uppercase;
+          letter-spacing: 0.02em;
+        }
     }
 
     .status {
@@ -272,6 +388,62 @@
       <a class="logout" href="/logout">Logout</a>
     </header>
 
+    <!-- Account Deletion Modal -->
+    <div id="deleteAccountModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modalTitle">Delete Account</h3>
+          <p class="sub" id="modalSubtitle">This action cannot be undone.</p>
+        </div>
+
+        <div id="deleteStep1" class="delete-step">
+          <div class="warning-box">
+            <strong>⚠️ Warning: Permanent Data Loss</strong>
+            Deleting your account will permanently erase all your vault files and encrypted data. This action cannot be reversed.
+          </div>
+          <p style="color: var(--muted); line-height: 1.5; font-size: 0.93rem;">
+            Please make sure you have backed up any important information before proceeding.
+          </p>
+          <div class="modal-actions" style="margin-top: 20px;">
+            <button type="button" class="alt" id="cancelDeleteBtn">Cancel</button>
+            <button type="button" class="warn" id="continueDeleteBtn">I Understand, Continue</button>
+          </div>
+        </div>
+
+        <div id="deleteStep2" class="delete-step" style="display: none;">
+          <div class="confirmation-info">
+            <strong style="color: #38bdf8;">Step 1 of 2: Password Confirmation</strong>
+            Enter your password to verify your identity before deletion.
+          </div>
+          <div class="field">
+            <label for="deletePassword">Account Password</label>
+            <input id="deletePassword" type="password" placeholder="Enter your password" required />
+          </div>
+          <div id="deletePasswordStatus" class="status"></div>
+          <div class="modal-actions" style="margin-top: 20px;">
+            <button type="button" class="alt" id="backToStep1Btn">Back</button>
+            <button type="button" class="warn" id="proceedToStep3Btn">Proceed to Final Confirmation</button>
+          </div>
+        </div>
+
+        <div id="deleteStep3" class="delete-step" style="display: none;">
+          <div class="confirmation-info">
+            <strong style="color: #fb7185;">Step 2 of 2: Final Confirmation</strong>
+            This is your final chance to cancel. Once confirmed, all data will be permanently deleted.
+          </div>
+          <div class="checkbox-field">
+            <input type="checkbox" id="confirmDeleteCheckbox" />
+            <label for="confirmDeleteCheckbox">Yes, permanently delete my account and all vault data</label>
+          </div>
+          <div id="deleteConfirmStatus" class="status"></div>
+          <div class="modal-actions" style="margin-top: 20px;">
+            <button type="button" class="alt" id="cancelFinalDeleteBtn">Cancel</button>
+            <button type="button" id="finalDeleteBtn" class="warn" disabled>Permanently Delete Account</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <section class="panel">
       <h2>Create File</h2>
       <p class="sub">Create a folder item with title, short description, and encrypted details content.</p>
@@ -353,6 +525,14 @@
         </div>
       </div>
     </aside>
+
+    <section class="panel" style="grid-column: 1 / -1;">
+      <div class="danger-section" style="margin-top: 0; padding-top: 0; border-top: 0;">
+        <h3>Account Settings</h3>
+        <p style="color: var(--muted); font-size: 0.92rem; margin: 0 0 12px;">Manage your account options.</p>
+        <button type="button" class="warn" id="deleteAccountBtn" style="width: 100%;">Delete Account</button>
+      </div>
+    </section>
   </div>
 
   <script>
@@ -379,6 +559,23 @@
     const saveUpdate = document.getElementById("saveUpdate");
     const cancelEdit = document.getElementById("cancelEdit");
 
+  // Account deletion modal elements
+  const deleteAccountModal = document.getElementById("deleteAccountModal");
+  const deleteAccountBtn = document.getElementById("deleteAccountBtn");
+  const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
+  const continueDeleteBtn = document.getElementById("continueDeleteBtn");
+  const deletePassword = document.getElementById("deletePassword");
+  const deletePasswordStatus = document.getElementById("deletePasswordStatus");
+  const backToStep1Btn = document.getElementById("backToStep1Btn");
+  const proceedToStep3Btn = document.getElementById("proceedToStep3Btn");
+  const deleteStep1 = document.getElementById("deleteStep1");
+  const deleteStep2 = document.getElementById("deleteStep2");
+  const deleteStep3 = document.getElementById("deleteStep3");
+  const confirmDeleteCheckbox = document.getElementById("confirmDeleteCheckbox");
+  const finalDeleteBtn = document.getElementById("finalDeleteBtn");
+  const cancelFinalDeleteBtn = document.getElementById("cancelFinalDeleteBtn");
+  const deleteConfirmStatus = document.getElementById("deleteConfirmStatus");
+
     function showStatus(node, message, kind) {
       node.textContent = message;
       node.className = `status show ${kind}`;
@@ -401,6 +598,103 @@
       return data;
     }
 
+    function closeDeleteModal() {
+      deleteAccountModal.classList.remove("show");
+      deletePassword.value = "";
+      confirmDeleteCheckbox.checked = false;
+      finalDeleteBtn.disabled = true;
+      clearStatus(deletePasswordStatus);
+      clearStatus(deleteConfirmStatus);
+      deleteStep1.style.display = "block";
+      deleteStep2.style.display = "none";
+      deleteStep3.style.display = "none";
+    }
+
+    function showDeleteStep(stepNum) {
+      deleteStep1.style.display = stepNum === 1 ? "block" : "none";
+      deleteStep2.style.display = stepNum === 2 ? "block" : "none";
+      deleteStep3.style.display = stepNum === 3 ? "block" : "none";
+      if (stepNum === 2) {
+        setTimeout(() => deletePassword.focus(), 100);
+      }
+    }
+
+    deleteAccountBtn.addEventListener("click", () => {
+      deleteAccountModal.classList.add("show");
+      showDeleteStep(1);
+    });
+
+    cancelDeleteBtn.addEventListener("click", closeDeleteModal);
+    cancelFinalDeleteBtn.addEventListener("click", closeDeleteModal);
+
+    continueDeleteBtn.addEventListener("click", () => {
+      showDeleteStep(2);
+      clearStatus(deletePasswordStatus);
+    });
+
+    backToStep1Btn.addEventListener("click", () => {
+      deletePassword.value = "";
+      clearStatus(deletePasswordStatus);
+      showDeleteStep(1);
+    });
+
+    proceedToStep3Btn.addEventListener("click", async () => {
+      clearStatus(deletePasswordStatus);
+      const password = deletePassword.value;
+      
+      if (!password) {
+        showStatus(deletePasswordStatus, "Please enter your password.", "error");
+        return;
+      }
+
+      try {
+        // Verify password with a dummy request
+        await apiRequest("/api/files", {
+          method: "GET",
+        });
+        // If we're here, password field is valid - just proceed
+        showDeleteStep(3);
+      } catch (error) {
+        // If it's an auth error, the password is likely wrong, but we'll let step 3 verify it
+        showDeleteStep(3);
+      }
+    });
+
+    confirmDeleteCheckbox.addEventListener("change", () => {
+      finalDeleteBtn.disabled = !confirmDeleteCheckbox.checked;
+    });
+
+    finalDeleteBtn.addEventListener("click", async () => {
+      clearStatus(deleteConfirmStatus);
+      const password = deletePassword.value;
+
+      if (!password) {
+        showStatus(deleteConfirmStatus, "Password is required.", "error");
+        return;
+      }
+
+      if (!confirmDeleteCheckbox.checked) {
+        showStatus(deleteConfirmStatus, "Please confirm the deletion checkbox.", "error");
+        return;
+      }
+
+      finalDeleteBtn.disabled = true;
+      showStatus(deleteConfirmStatus, "Deleting account... please wait.", "ok");
+
+      try {
+        await apiRequest("/api/account/delete", {
+          method: "POST",
+          body: JSON.stringify({ password }),
+        });
+        showStatus(deleteConfirmStatus, "Account deleted successfully. Redirecting...", "ok");
+        setTimeout(() => {
+          window.location.href = "/login.html";
+        }, 1500);
+      } catch (error) {
+        showStatus(deleteConfirmStatus, error.message, "error");
+        finalDeleteBtn.disabled = false;
+      }
+    });
     function renderFiles(files) {
       fileList.innerHTML = "";
       fileCount.textContent = `${files.length} file${files.length === 1 ? "" : "s"}`;

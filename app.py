@@ -595,6 +595,55 @@ def delete_user_file(file_id: int):
             target_path.unlink()
 
     return jsonify({"message": "File deleted successfully."})
+
+@app.post("/api/account/delete")
+def delete_account():
+    auth_error = json_auth_required()
+    if auth_error:
+        return auth_error
+
+    userid = session_user()
+    password = payload_value("password")
+
+    if not password:
+        return jsonify({"error": "Account password confirmation is required."}), 400
+    if not verify_user_password(userid, password):
+        return jsonify({"error": "Password confirmation failed."}), 403
+
+    with db_connection() as conn:
+        # Get all user files before deletion
+        user_files = conn.execute(
+            "SELECT file_name FROM user_files WHERE userid = ?",
+            (userid,),
+        ).fetchall()
+
+        # Delete all user files from database
+        conn.execute("DELETE FROM user_files WHERE userid = ?", (userid,))
+
+        # Delete user account from database
+        conn.execute("DELETE FROM users WHERE userid = ?", (userid,))
+
+    # Delete all user files from filesystem
+    for row in user_files:
+        relpath = row["file_name"] or ""
+        if relpath:
+            target_path = storage_abspath_from_relpath(relpath)
+            if target_path.exists():
+                target_path.unlink()
+
+    # Delete empty user folder
+    user_folder_path = user_folder(userid)
+    try:
+        if user_folder_path.exists():
+            user_folder_path.rmdir()
+    except OSError:
+        pass
+
+    # Clear session
+    session.clear()
+
+    return jsonify({"message": "Account deleted successfully."})
+
 print("Serving from:", BASE_DIR)
 
 if __name__ == "__main__":
