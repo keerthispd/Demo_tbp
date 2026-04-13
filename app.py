@@ -210,6 +210,14 @@ def ensure_database_ready() -> None:
     init_db()
 
 
+@app.after_request
+def apply_no_store_headers(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+
 @app.get("/")
 def home():
     if session_user():
@@ -587,7 +595,7 @@ def delete_user_file(file_id: int):
             target_path.unlink()
 
     return jsonify({"message": "File deleted successfully."})
-
+print("Serving from:", BASE_DIR)
 
 if __name__ == "__main__":
     init_db()
