@@ -356,6 +356,10 @@
 
     <section class="panel" style="grid-column: 1 / -1;">
       <div>
+        <h2 style="margin: 0 0 8px;">Account Settings</h2>
+        <div class="sub" style="margin: 0 0 12px;">
+          User ID: <strong id="accountUserId">Loading...</strong>
+        </div>
         <button type="button" class="warn" id="deleteAccountBtn" style="width: 100%;">Delete Account</button>
         <div id="deleteAccountStatus" class="status" style="margin-top: 12px;"></div>
       </div>
@@ -388,6 +392,7 @@
 
     const deleteAccountBtn = document.getElementById("deleteAccountBtn");
     const deleteAccountStatus = document.getElementById("deleteAccountStatus");
+    const accountUserId = document.getElementById("accountUserId");
 
     function showStatus(node, message, kind) {
       node.textContent = message;
@@ -409,6 +414,15 @@
         throw new Error(data.error || "Request failed.");
       }
       return data;
+    }
+
+    async function loadAccountInfo() {
+      try {
+        const data = await apiRequest("/api/account");
+        accountUserId.textContent = data.userid || "Unknown";
+      } catch (error) {
+        accountUserId.textContent = "Unavailable";
+      }
     }
 
     deleteAccountBtn.addEventListener("click", async () => {
@@ -657,6 +671,7 @@
       clearStatus(editStatus);
     });
 
+    loadAccountInfo();
     loadFiles();
   </script>
 </body>

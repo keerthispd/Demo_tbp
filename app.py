@@ -407,6 +407,15 @@ def list_user_files():
     return jsonify({"files": files})
 
 
+@app.get("/api/account")
+def get_account_info():
+    auth_error = json_auth_required()
+    if auth_error:
+        return auth_error
+
+    return jsonify({"userid": session_user()})
+
+
 @app.post("/api/files")
 def create_user_file():
     auth_error = json_auth_required()
