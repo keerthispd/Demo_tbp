@@ -409,19 +409,28 @@
         headers: { "Content-Type": "application/json" },
         ...options,
       });
-      const data = await response.json().catch(() => ({}));
+      const raw = await response.text();
+      let data = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch (parseError) {
+        data = {};
+      }
       if (!response.ok) {
-        throw new Error(data.error || "Request failed.");
+        const textFallback = raw && !raw.trim().startsWith("<") ? raw.trim() : "";
+        const message = data.error || data.message || textFallback || `Request failed (${response.status}).`;
+        throw new Error(message);
       }
       return data;
     }
 
     async function loadAccountInfo() {
       try {
-        const data = await apiRequest("/api/account");
+        const data = await apiRequest("/api/files");
         accountUserId.textContent = data.userid || "Unknown";
       } catch (error) {
         accountUserId.textContent = "Unavailable";
+        showStatus(deleteAccountStatus, `Unable to load user ID: ${error.message}`, "error");
       }
     }
 

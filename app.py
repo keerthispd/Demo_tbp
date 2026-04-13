@@ -404,7 +404,7 @@ def list_user_files():
         }
         for row in rows
     ]
-    return jsonify({"files": files})
+    return jsonify({"userid": userid, "files": files})
 
 
 @app.get("/api/account")
