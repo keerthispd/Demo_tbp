@@ -256,6 +256,49 @@
       font-size: 0.84rem;
     }
 
+    .attachment-preview {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(166, 180, 194, 0.16);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .attachment-preview img,
+    .attachment-preview iframe,
+    .attachment-preview audio {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid rgba(166, 180, 194, 0.2);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .attachment-preview img {
+      max-height: 380px;
+      object-fit: contain;
+    }
+
+    .attachment-preview iframe {
+      min-height: 360px;
+    }
+
+    .attachment-preview pre {
+      margin: 0;
+      max-height: 280px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font: 0.86rem/1.45 Consolas, "Courier New", monospace;
+      color: #d8e7f5;
+    }
+
+    .hint {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.4;
+    }
+
     @media (max-width: 950px) {
       .layout { grid-template-columns: 1fr; }
       .topbar { flex-direction: column; align-items: flex-start; }
@@ -290,7 +333,13 @@
 
         <div class="field">
           <label for="newContent">Details (passwords, bank details, notes)</label>
-          <textarea id="newContent" name="content" required></textarea>
+          <textarea id="newContent" name="content"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="newUploadFile">Upload image, audio, or document (optional)</label>
+          <input id="newUploadFile" name="upload_file" type="file" accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.rtf,.csv,.xls,.xlsx,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.aac,.flac" />
+          <div class="hint">Allowed: images, audio (mp3/wav/m4a/ogg/aac/flac), PDF, Word, text, CSV, Excel, PowerPoint. Max size: 10 MB.</div>
         </div>
 
         <div class="btn-row">
@@ -314,6 +363,17 @@
         <div class="field">
           <label for="viewContent">Details</label>
           <textarea id="viewContent" readonly></textarea>
+        </div>
+        <div class="field">
+          <label>Uploaded file</label>
+          <input id="viewUploadInfo" type="text" readonly value="No uploaded file" />
+        </div>
+        <div class="btn-row">
+          <button type="button" class="alt" id="downloadFileBtn" style="display:none;">Download uploaded file</button>
+        </div>
+        <div id="attachmentPreview" class="attachment-preview" style="display:none;">
+          <div id="attachmentPreviewLabel" class="hint" style="margin-top:0; margin-bottom:8px;"></div>
+          <div id="attachmentPreviewBody"></div>
         </div>
         <div class="meta" id="viewMeta"></div>
       </div>
@@ -341,7 +401,16 @@
         </div>
         <div class="field">
           <label for="editContent">Details</label>
-          <textarea id="editContent" required></textarea>
+          <textarea id="editContent"></textarea>
+        </div>
+        <div class="field">
+          <label for="editUploadFile">Replace uploaded file (optional)</label>
+          <input id="editUploadFile" type="file" accept="image/*,audio/*,.pdf,.doc,.docx,.txt,.rtf,.csv,.xls,.xlsx,.ppt,.pptx,.mp3,.wav,.m4a,.ogg,.aac,.flac" />
+          <div class="hint">Allowed: images, audio (mp3/wav/m4a/ogg/aac/flac), PDF, Word, text, CSV, Excel, PowerPoint. Max size: 10 MB.</div>
+        </div>
+        <div class="field" style="display:flex; align-items:center; gap:8px;">
+          <input id="editRemoveUpload" type="checkbox" style="width:auto;" />
+          <label for="editRemoveUpload" style="margin:0;">Remove existing uploaded file</label>
         </div>
         <div class="field">
           <label for="editPassword">Confirm account password</label>
@@ -380,12 +449,19 @@
     const viewDescription = document.getElementById("viewDescription");
     const viewContent = document.getElementById("viewContent");
     const viewMeta = document.getElementById("viewMeta");
+    const viewUploadInfo = document.getElementById("viewUploadInfo");
+    const downloadFileBtn = document.getElementById("downloadFileBtn");
+    const attachmentPreview = document.getElementById("attachmentPreview");
+    const attachmentPreviewLabel = document.getElementById("attachmentPreviewLabel");
+    const attachmentPreviewBody = document.getElementById("attachmentPreviewBody");
 
     const editor = document.getElementById("editor");
     const editFileId = document.getElementById("editFileId");
     const editTitle = document.getElementById("editTitle");
     const editDescription = document.getElementById("editDescription");
     const editContent = document.getElementById("editContent");
+    const editUploadFile = document.getElementById("editUploadFile");
+    const editRemoveUpload = document.getElementById("editRemoveUpload");
     const editPassword = document.getElementById("editPassword");
     const saveUpdate = document.getElementById("saveUpdate");
     const cancelEdit = document.getElementById("cancelEdit");
@@ -393,6 +469,7 @@
     const deleteAccountBtn = document.getElementById("deleteAccountBtn");
     const deleteAccountStatus = document.getElementById("deleteAccountStatus");
     const accountUserId = document.getElementById("accountUserId");
+    let currentAttachmentPreviewUrl = "";
 
     function showStatus(node, message, kind) {
       node.textContent = message;
@@ -404,10 +481,107 @@
       node.className = "status";
     }
 
+    function formatBytes(bytes) {
+      const value = Number(bytes) || 0;
+      if (value < 1024) {
+        return `${value} B`;
+      }
+      const units = ["KB", "MB", "GB"];
+      let size = value;
+      let idx = -1;
+      while (size >= 1024 && idx < units.length - 1) {
+        size /= 1024;
+        idx += 1;
+      }
+      return `${size.toFixed(size >= 10 || idx === 0 ? 1 : 2)} ${units[idx]}`;
+    }
+
+    function clearAttachmentPreview() {
+      if (currentAttachmentPreviewUrl) {
+        URL.revokeObjectURL(currentAttachmentPreviewUrl);
+        currentAttachmentPreviewUrl = "";
+      }
+      attachmentPreview.style.display = "none";
+      attachmentPreviewLabel.textContent = "";
+      attachmentPreviewBody.innerHTML = "";
+    }
+
+    function blobFromBase64(base64Content, mimeType) {
+      const binary = atob(base64Content || "");
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return new Blob([bytes], { type: mimeType || "application/octet-stream" });
+    }
+
+    async function renderAttachmentPreview(fileId, password, fallbackMime, fallbackName) {
+      clearAttachmentPreview();
+
+      const payload = await apiRequest(`/api/files/${fileId}/attachment`, {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      });
+
+      const mimeType = (payload.uploaded_file_mime || fallbackMime || "application/octet-stream").toLowerCase();
+      const fileName = payload.uploaded_file_name || fallbackName || "uploaded-file";
+      const blob = blobFromBase64(payload.content_base64 || "", mimeType);
+      const previewUrl = URL.createObjectURL(blob);
+      currentAttachmentPreviewUrl = previewUrl;
+
+      attachmentPreviewLabel.textContent = `Inline preview: ${fileName} (${formatBytes(payload.uploaded_file_size || 0)})`;
+      attachmentPreview.style.display = "block";
+
+      if (mimeType.startsWith("image/")) {
+        const image = document.createElement("img");
+        image.src = previewUrl;
+        image.alt = fileName;
+        attachmentPreviewBody.appendChild(image);
+        return;
+      }
+
+      if (mimeType.startsWith("audio/")) {
+        const audio = document.createElement("audio");
+        audio.controls = true;
+        audio.preload = "metadata";
+        audio.src = previewUrl;
+        attachmentPreviewBody.appendChild(audio);
+        return;
+      }
+
+      if (mimeType === "application/pdf") {
+        const frame = document.createElement("iframe");
+        frame.src = previewUrl;
+        frame.title = fileName;
+        attachmentPreviewBody.appendChild(frame);
+        return;
+      }
+
+      if (mimeType.startsWith("text/") || mimeType === "application/rtf") {
+        const textContent = await blob.text();
+        const textNode = document.createElement("pre");
+        textNode.textContent = textContent;
+        attachmentPreviewBody.appendChild(textNode);
+        return;
+      }
+
+      const fallback = document.createElement("div");
+      fallback.className = "hint";
+      fallback.style.marginTop = "0";
+      fallback.textContent = "This file type cannot be rendered inline here. Use download to open it in a native app.";
+      attachmentPreviewBody.appendChild(fallback);
+    }
+
     async function apiRequest(url, options = {}) {
+      const isFormData = options.body instanceof FormData;
+      const headers = { ...(options.headers || {}) };
+      if (!isFormData) {
+        headers["Content-Type"] = headers["Content-Type"] || "application/json";
+      }
+
       const response = await fetch(url, {
-        headers: { "Content-Type": "application/json" },
         ...options,
+        headers,
       });
       const raw = await response.text();
       let data = {};
@@ -492,6 +666,11 @@
         desc.className = "file-desc";
         desc.textContent = file.description || "No description provided.";
 
+        const uploadMeta = document.createElement("small");
+        uploadMeta.textContent = file.has_uploaded_file
+          ? `Attachment: ${file.uploaded_file_name} (${formatBytes(file.uploaded_file_size)})`
+          : "Attachment: none";
+
         const meta = document.createElement("small");
         meta.textContent = `Created: ${new Date(file.created_at).toLocaleString()} | Updated: ${new Date(file.updated_at).toLocaleString()}`;
 
@@ -516,7 +695,7 @@
         deleteBtn.onclick = () => deleteFile(file.id, file.title);
 
         actions.append(displayBtn, updateBtn, deleteBtn);
-        card.append(title, desc, meta, actions);
+        card.append(title, desc, uploadMeta, meta, actions);
         fileList.appendChild(card);
       });
     }
@@ -533,6 +712,7 @@
 
     async function displayFile(fileId) {
       clearStatus(viewStatus);
+      clearAttachmentPreview();
       const password = prompt("Confirm your account password to display this file:");
       if (!password) {
         showStatus(viewStatus, "Display cancelled. Password confirmation required.", "error");
@@ -547,6 +727,19 @@
         viewTitle.value = data.title || "";
         viewDescription.value = data.description || "";
         viewContent.value = data.content || "";
+        if (data.has_uploaded_file) {
+          const uploadName = data.uploaded_file_name || "encrypted-upload";
+          const uploadSize = formatBytes(data.uploaded_file_size || 0);
+          viewUploadInfo.value = `${uploadName} (${uploadSize})`;
+          downloadFileBtn.style.display = "inline-block";
+          downloadFileBtn.dataset.fileId = String(fileId);
+          await renderAttachmentPreview(fileId, password, data.uploaded_file_mime, uploadName);
+        } else {
+          viewUploadInfo.value = "No uploaded file";
+          downloadFileBtn.style.display = "none";
+          downloadFileBtn.dataset.fileId = "";
+          clearAttachmentPreview();
+        }
         viewMeta.textContent = `Created: ${new Date(data.created_at).toLocaleString()} | Updated: ${new Date(data.updated_at).toLocaleString()}`;
         showStatus(viewStatus, "File displayed successfully.", "ok");
       } catch (error) {
@@ -572,6 +765,8 @@
         editTitle.value = data.title || fallbackTitle || "";
         editDescription.value = data.description || "";
         editContent.value = data.content || "";
+        editUploadFile.value = "";
+        editRemoveUpload.checked = false;
         editPassword.value = "";
         editor.style.display = "block";
         showStatus(editStatus, "File loaded. Enter password again to confirm update.", "ok");
@@ -613,15 +808,28 @@
       const title = document.getElementById("newTitle").value.trim();
       const description = document.getElementById("newDescription").value.trim();
       const content = document.getElementById("newContent").value;
-      if (!title || !content.trim()) {
-        showStatus(createStatus, "Title and content are required.", "error");
+      const uploadFile = document.getElementById("newUploadFile").files[0] || null;
+      if (!title) {
+        showStatus(createStatus, "Title is required.", "error");
+        return;
+      }
+      if (!content.trim() && !uploadFile) {
+        showStatus(createStatus, "Provide details text or upload an image/audio/document.", "error");
         return;
       }
 
       try {
+        const formData = new FormData();
+        formData.append("title", title);
+        formData.append("description", description);
+        formData.append("content", content);
+        if (uploadFile) {
+          formData.append("upload_file", uploadFile);
+        }
+
         await apiRequest("/api/files", {
           method: "POST",
-          body: JSON.stringify({ title, description, content }),
+          body: formData,
         });
         showStatus(createStatus, "File created successfully.", "ok");
         createForm.reset();
@@ -642,6 +850,8 @@
       const title = editTitle.value.trim();
       const description = editDescription.value.trim();
       const content = editContent.value;
+      const uploadFile = editUploadFile.files[0] || null;
+      const removeUpload = editRemoveUpload.checked;
       const password = editPassword.value;
 
       if (!fileId) {
@@ -658,11 +868,23 @@
       }
 
       try {
+        const formData = new FormData();
+        formData.append("title", title);
+        formData.append("description", description);
+        formData.append("content", content);
+        formData.append("password", password);
+        formData.append("remove_upload", removeUpload ? "true" : "false");
+        if (uploadFile) {
+          formData.append("upload_file", uploadFile);
+        }
+
         await apiRequest(`/api/files/${fileId}/update`, {
           method: "POST",
-          body: JSON.stringify({ title, description, content, password }),
+          body: formData,
         });
         showStatus(editStatus, "File updated successfully.", "ok");
+        editUploadFile.value = "";
+        editRemoveUpload.checked = false;
         editPassword.value = "";
         await loadFiles();
       } catch (error) {
@@ -676,8 +898,67 @@
       editTitle.value = "";
       editDescription.value = "";
       editContent.value = "";
+      editUploadFile.value = "";
+      editRemoveUpload.checked = false;
       editPassword.value = "";
       clearStatus(editStatus);
+    });
+
+    downloadFileBtn.addEventListener("click", async () => {
+      clearStatus(viewStatus);
+      const fileId = downloadFileBtn.dataset.fileId;
+      if (!fileId) {
+        showStatus(viewStatus, "Display a file first to download its attachment.", "error");
+        return;
+      }
+
+      const password = prompt("Confirm your account password to download this uploaded file:");
+      if (!password) {
+        showStatus(viewStatus, "Download cancelled. Password confirmation required.", "error");
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/files/${fileId}/download`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password }),
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          let message = `Download failed (${response.status}).`;
+          try {
+            const parsed = text ? JSON.parse(text) : {};
+            if (parsed.error || parsed.message) {
+              message = parsed.error || parsed.message;
+            }
+          } catch (_) {
+            if (text && !text.trim().startsWith("<")) {
+              message = text.trim();
+            }
+          }
+          throw new Error(message);
+        }
+
+        const blob = await response.blob();
+        const contentDisposition = response.headers.get("Content-Disposition") || "";
+        const nameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+        const suggestedName = nameMatch ? nameMatch[1] : "vault-download";
+
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = suggestedName;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+
+        showStatus(viewStatus, "Downloaded uploaded file successfully.", "ok");
+      } catch (error) {
+        showStatus(viewStatus, error.message, "error");
+      }
     });
 
     loadAccountInfo();

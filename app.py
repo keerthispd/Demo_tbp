@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import io
 import os
 import re
 import sqlite3
@@ -10,15 +11,62 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from flask import Flask, jsonify, redirect, request, send_from_directory, session
+from flask import Flask, jsonify, redirect, request, send_file, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
 
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "cryptosafe.db"
-USER_FILES_DIR = BASE_DIR / "vault_files"
 LOCKOUT_DURATION = timedelta(hours=24)
 MAX_FAILED_ATTEMPTS = 3
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+ALLOWED_UPLOAD_EXTENSIONS = {
+    "png",
+    "jpg",
+    "jpeg",
+    "gif",
+    "webp",
+    "bmp",
+    "svg",
+    "pdf",
+    "doc",
+    "docx",
+    "txt",
+    "rtf",
+    "csv",
+    "xls",
+    "xlsx",
+    "ppt",
+    "pptx",
+    "mp3",
+    "wav",
+    "m4a",
+    "ogg",
+    "aac",
+    "flac",
+}
+ALLOWED_UPLOAD_MIME_PREFIXES = ("image/", "audio/")
+ALLOWED_UPLOAD_MIME_TYPES = {
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+    "text/csv",
+    "application/rtf",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "audio/mpeg",
+    "audio/mp3",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/mp4",
+    "audio/ogg",
+    "audio/aac",
+    "audio/flac",
+}
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
@@ -61,9 +109,22 @@ def decrypt_text(encoded_text: str) -> str:
     return plain.decode("utf-8")
 
 
-def init_db() -> None:
-    USER_FILES_DIR.mkdir(parents=True, exist_ok=True)
+def encrypt_bytes(payload: bytes) -> str:
+    aes = AESGCM(AES_256_KEY)
+    nonce = os.urandom(12)
+    cipher = aes.encrypt(nonce, payload, None)
+    return base64.urlsafe_b64encode(nonce + cipher).decode("ascii")
 
+
+def decrypt_bytes(encoded_payload: str) -> bytes:
+    raw = base64.urlsafe_b64decode(encoded_payload.encode("ascii"))
+    nonce = raw[:12]
+    cipher = raw[12:]
+    aes = AESGCM(AES_256_KEY)
+    return aes.decrypt(nonce, cipher, None)
+
+
+def init_db() -> None:
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """
@@ -117,6 +178,22 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE user_files ADD COLUMN content_encrypted TEXT NOT NULL DEFAULT ''"
             )
+        if "uploaded_file_name" not in file_columns:
+            conn.execute(
+                "ALTER TABLE user_files ADD COLUMN uploaded_file_name TEXT NOT NULL DEFAULT ''"
+            )
+        if "uploaded_file_mime" not in file_columns:
+            conn.execute(
+                "ALTER TABLE user_files ADD COLUMN uploaded_file_mime TEXT NOT NULL DEFAULT ''"
+            )
+        if "uploaded_file_size" not in file_columns:
+            conn.execute(
+                "ALTER TABLE user_files ADD COLUMN uploaded_file_size INTEGER NOT NULL DEFAULT 0"
+            )
+        if "uploaded_file_encrypted" not in file_columns:
+            conn.execute(
+                "ALTER TABLE user_files ADD COLUMN uploaded_file_encrypted TEXT NOT NULL DEFAULT ''"
+            )
 
 
 def db_connection() -> sqlite3.Connection:
@@ -163,29 +240,36 @@ def payload_value(name: str) -> str:
     return str(request.form.get(name, ""))
 
 
-def legacy_file_name(title: str) -> str:
-    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", title.strip()).strip("-").lower()
-    if not slug:
-        slug = "item"
-    timestamp = int(now_utc().timestamp() * 1000)
-    return f"{slug}-{timestamp}"
+def payload_bool(name: str) -> bool:
+    value = payload_value(name).strip().lower()
+    return value in {"1", "true", "yes", "on"}
 
 
-def user_folder(userid: str) -> Path:
-    folder = USER_FILES_DIR / userid
-    folder.mkdir(parents=True, exist_ok=True)
-    return folder
+def uploaded_file_from_request(field_name: str = "upload_file"):
+    uploaded = request.files.get(field_name)
+    if uploaded is None:
+        return None
+    if not (uploaded.filename or "").strip():
+        return None
+    return uploaded
 
 
-def storage_relpath_for_title(userid: str, title: str, file_id: int) -> str:
-    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", title.strip()).strip("-").lower()
-    if not slug:
-        slug = "item"
-    return f"{userid}/{slug}-{file_id}.enc"
+def validate_uploaded_file(filename: str, mime_type: str, size_bytes: int) -> str | None:
+    safe_name = secure_filename(filename)
+    extension = ""
+    if "." in safe_name:
+        extension = safe_name.rsplit(".", 1)[1].lower()
 
+    is_allowed_ext = extension in ALLOWED_UPLOAD_EXTENSIONS
+    is_allowed_mime = mime_type in ALLOWED_UPLOAD_MIME_TYPES or any(
+        mime_type.startswith(prefix) for prefix in ALLOWED_UPLOAD_MIME_PREFIXES
+    )
 
-def storage_abspath_from_relpath(relpath: str) -> Path:
-    return USER_FILES_DIR / relpath
+    if not is_allowed_ext and not is_allowed_mime:
+        return "Only image, audio, and document files are allowed."
+    if size_bytes > MAX_UPLOAD_BYTES:
+        return "Uploaded file is too large (max 10 MB)."
+    return None
 
 
 def verify_user_password(userid: str, password: str) -> bool:
@@ -386,7 +470,8 @@ def list_user_files():
     with db_connection() as conn:
         rows = conn.execute(
             """
-            SELECT id, title, description, created_at, updated_at
+            SELECT id, title, description, created_at, updated_at,
+                   uploaded_file_name, uploaded_file_mime, uploaded_file_size
             FROM user_files
             WHERE userid = ?
             ORDER BY id DESC
@@ -401,6 +486,10 @@ def list_user_files():
             "description": row["description"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+            "has_uploaded_file": bool(row["uploaded_file_name"]),
+            "uploaded_file_name": row["uploaded_file_name"],
+            "uploaded_file_mime": row["uploaded_file_mime"],
+            "uploaded_file_size": row["uploaded_file_size"],
         }
         for row in rows
     ]
@@ -426,17 +515,46 @@ def create_user_file():
     title = payload_value("title").strip()
     description = payload_value("description").strip()
     content = payload_value("content")
+    upload = uploaded_file_from_request("upload_file")
 
     if not title:
         return jsonify({"error": "Title is required."}), 400
+    if not content.strip() and upload is None:
+        return jsonify({"error": "Provide details text or upload an image/document."}), 400
+
+    uploaded_name = ""
+    uploaded_mime = ""
+    uploaded_size = 0
+    uploaded_encrypted = ""
+    if upload is not None:
+        raw_file_bytes = upload.read()
+        uploaded_size = len(raw_file_bytes)
+        uploaded_name = secure_filename(upload.filename or "")
+        uploaded_mime = (upload.mimetype or "application/octet-stream").lower()
+        validation_error = validate_uploaded_file(uploaded_name, uploaded_mime, uploaded_size)
+        if validation_error:
+            return jsonify({"error": validation_error}), 400
+        uploaded_encrypted = encrypt_bytes(raw_file_bytes)
 
     current_time = now_utc().isoformat()
     encrypted_content = encrypt_text(content)
     with db_connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO user_files (userid, title, description, content_encrypted, file_name, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO user_files (
+                userid,
+                title,
+                description,
+                content_encrypted,
+                file_name,
+                uploaded_file_name,
+                uploaded_file_mime,
+                uploaded_file_size,
+                uploaded_file_encrypted,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 userid,
@@ -444,21 +562,15 @@ def create_user_file():
                 description,
                 encrypted_content,
                 "",
+                uploaded_name,
+                uploaded_mime,
+                uploaded_size,
+                uploaded_encrypted,
                 current_time,
                 current_time,
             ),
         )
         file_id = cursor.lastrowid
-
-        relpath = storage_relpath_for_title(userid, title, file_id)
-        conn.execute(
-            "UPDATE user_files SET file_name = ? WHERE id = ? AND userid = ?",
-            (relpath, file_id, userid),
-        )
-
-    target_path = storage_abspath_from_relpath(relpath)
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    target_path.write_text(encrypted_content, encoding="utf-8")
 
     return jsonify({"id": file_id, "message": "File created successfully."}), 201
 
@@ -479,7 +591,9 @@ def display_user_file(file_id: int):
     with db_connection() as conn:
         row = conn.execute(
             """
-            SELECT id, title, description, content_encrypted, file_name, created_at, updated_at
+            SELECT id, title, description, content_encrypted,
+                   uploaded_file_name, uploaded_file_mime, uploaded_file_size,
+                   uploaded_file_encrypted, created_at, updated_at
             FROM user_files
             WHERE id = ? AND userid = ?
             """,
@@ -491,11 +605,6 @@ def display_user_file(file_id: int):
 
     try:
         encrypted_payload = row["content_encrypted"] or ""
-        if row["file_name"]:
-            file_path = storage_abspath_from_relpath(row["file_name"])
-            if file_path.exists():
-                encrypted_payload = file_path.read_text(encoding="utf-8")
-
         content = decrypt_text(encrypted_payload) if encrypted_payload else ""
     except Exception:
         return jsonify({"error": "Unable to decrypt stored content."}), 500
@@ -508,6 +617,97 @@ def display_user_file(file_id: int):
             "content": content,
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+            "has_uploaded_file": bool(row["uploaded_file_encrypted"]),
+            "uploaded_file_name": row["uploaded_file_name"],
+            "uploaded_file_mime": row["uploaded_file_mime"],
+            "uploaded_file_size": row["uploaded_file_size"],
+        }
+    )
+
+
+@app.post("/api/files/<int:file_id>/download")
+def download_user_file(file_id: int):
+    auth_error = json_auth_required()
+    if auth_error:
+        return auth_error
+
+    userid = session_user()
+    password = payload_value("password")
+    if not password:
+        return jsonify({"error": "Account password confirmation is required."}), 400
+    if not verify_user_password(userid, password):
+        return jsonify({"error": "Password confirmation failed."}), 403
+
+    with db_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT uploaded_file_name, uploaded_file_mime, uploaded_file_encrypted
+            FROM user_files
+            WHERE id = ? AND userid = ?
+            """,
+            (file_id, userid),
+        ).fetchone()
+
+    if row is None:
+        return jsonify({"error": "File not found."}), 404
+    if not row["uploaded_file_encrypted"]:
+        return jsonify({"error": "No uploaded file is stored for this entry."}), 404
+
+    try:
+        plain_bytes = decrypt_bytes(row["uploaded_file_encrypted"])
+    except Exception:
+        return jsonify({"error": "Unable to decrypt stored file."}), 500
+
+    download_name = row["uploaded_file_name"] or "vault-file"
+    mime_type = row["uploaded_file_mime"] or "application/octet-stream"
+    return send_file(
+        io.BytesIO(plain_bytes),
+        mimetype=mime_type,
+        as_attachment=True,
+        download_name=download_name,
+    )
+
+
+@app.post("/api/files/<int:file_id>/attachment")
+def get_user_file_attachment(file_id: int):
+    auth_error = json_auth_required()
+    if auth_error:
+        return auth_error
+
+    userid = session_user()
+    password = payload_value("password")
+    if not password:
+        return jsonify({"error": "Account password confirmation is required."}), 400
+    if not verify_user_password(userid, password):
+        return jsonify({"error": "Password confirmation failed."}), 403
+
+    with db_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT uploaded_file_name, uploaded_file_mime, uploaded_file_encrypted
+            FROM user_files
+            WHERE id = ? AND userid = ?
+            """,
+            (file_id, userid),
+        ).fetchone()
+
+    if row is None:
+        return jsonify({"error": "File not found."}), 404
+    if not row["uploaded_file_encrypted"]:
+        return jsonify({"error": "No uploaded file is stored for this entry."}), 404
+
+    try:
+        plain_bytes = decrypt_bytes(row["uploaded_file_encrypted"])
+    except Exception:
+        return jsonify({"error": "Unable to decrypt stored file."}), 500
+
+    mime_type = row["uploaded_file_mime"] or "application/octet-stream"
+    return jsonify(
+        {
+            "uploaded_file_name": row["uploaded_file_name"] or "vault-file",
+            "uploaded_file_mime": mime_type,
+            "uploaded_file_size": len(plain_bytes),
+            "content_base64": base64.b64encode(plain_bytes).decode("ascii"),
         }
     )
 
@@ -523,6 +723,8 @@ def update_user_file(file_id: int):
     title = payload_value("title").strip()
     description = payload_value("description").strip()
     content = payload_value("content")
+    upload = uploaded_file_from_request("upload_file")
+    remove_upload = payload_bool("remove_upload")
 
     if not password:
         return jsonify({"error": "Account password confirmation is required."}), 400
@@ -536,13 +738,44 @@ def update_user_file(file_id: int):
 
     with db_connection() as conn:
         row = conn.execute(
-            "SELECT id, file_name FROM user_files WHERE id = ? AND userid = ?",
+            """
+            SELECT id, uploaded_file_name, uploaded_file_mime,
+                   uploaded_file_size, uploaded_file_encrypted
+            FROM user_files
+            WHERE id = ? AND userid = ?
+            """,
             (file_id, userid),
         ).fetchone()
         if row is None:
             return jsonify({"error": "File not found."}), 404
 
-        new_relpath = storage_relpath_for_title(userid, title, file_id)
+        uploaded_name = row["uploaded_file_name"] or ""
+        uploaded_mime = row["uploaded_file_mime"] or ""
+        uploaded_size = int(row["uploaded_file_size"] or 0)
+        uploaded_encrypted = row["uploaded_file_encrypted"] or ""
+
+        if remove_upload:
+            uploaded_name = ""
+            uploaded_mime = ""
+            uploaded_size = 0
+            uploaded_encrypted = ""
+
+        if upload is not None:
+            raw_file_bytes = upload.read()
+            new_size = len(raw_file_bytes)
+            new_name = secure_filename(upload.filename or "")
+            new_mime = (upload.mimetype or "application/octet-stream").lower()
+            validation_error = validate_uploaded_file(new_name, new_mime, new_size)
+            if validation_error:
+                return jsonify({"error": validation_error}), 400
+
+            uploaded_name = new_name
+            uploaded_mime = new_mime
+            uploaded_size = new_size
+            uploaded_encrypted = encrypt_bytes(raw_file_bytes)
+
+        if not content.strip() and not uploaded_encrypted:
+            return jsonify({"error": "Provide details text or keep/upload a file."}), 400
 
         conn.execute(
             """
@@ -550,22 +783,26 @@ def update_user_file(file_id: int):
             SET title = ?,
                 description = ?,
                 content_encrypted = ?,
-                file_name = ?,
+                uploaded_file_name = ?,
+                uploaded_file_mime = ?,
+                uploaded_file_size = ?,
+                uploaded_file_encrypted = ?,
                 updated_at = ?
             WHERE id = ? AND userid = ?
             """,
-            (title, description, encrypted_content, new_relpath, updated_at, file_id, userid),
+            (
+                title,
+                description,
+                encrypted_content,
+                uploaded_name,
+                uploaded_mime,
+                uploaded_size,
+                uploaded_encrypted,
+                updated_at,
+                file_id,
+                userid,
+            ),
         )
-
-    new_path = storage_abspath_from_relpath(new_relpath)
-    new_path.parent.mkdir(parents=True, exist_ok=True)
-    new_path.write_text(encrypted_content, encoding="utf-8")
-
-    old_relpath = row["file_name"] or ""
-    if old_relpath and old_relpath != new_relpath:
-        old_path = storage_abspath_from_relpath(old_relpath)
-        if old_path.exists():
-            old_path.unlink()
 
     return jsonify({"message": "File updated successfully."})
 
@@ -586,7 +823,7 @@ def delete_user_file(file_id: int):
 
     with db_connection() as conn:
         row = conn.execute(
-            "SELECT id, file_name FROM user_files WHERE id = ? AND userid = ?",
+            "SELECT id FROM user_files WHERE id = ? AND userid = ?",
             (file_id, userid),
         ).fetchone()
         if row is None:
@@ -596,12 +833,6 @@ def delete_user_file(file_id: int):
             "DELETE FROM user_files WHERE id = ? AND userid = ?",
             (file_id, userid),
         )
-
-    relpath = row["file_name"] or ""
-    if relpath:
-        target_path = storage_abspath_from_relpath(relpath)
-        if target_path.exists():
-            target_path.unlink()
 
     return jsonify({"message": "File deleted successfully."})
 
@@ -620,33 +851,11 @@ def delete_account():
         return jsonify({"error": "Password confirmation failed."}), 403
 
     with db_connection() as conn:
-        # Get all user files before deletion
-        user_files = conn.execute(
-            "SELECT file_name FROM user_files WHERE userid = ?",
-            (userid,),
-        ).fetchall()
-
         # Delete all user files from database
         conn.execute("DELETE FROM user_files WHERE userid = ?", (userid,))
 
         # Delete user account from database
         conn.execute("DELETE FROM users WHERE userid = ?", (userid,))
-
-    # Delete all user files from filesystem
-    for row in user_files:
-        relpath = row["file_name"] or ""
-        if relpath:
-            target_path = storage_abspath_from_relpath(relpath)
-            if target_path.exists():
-                target_path.unlink()
-
-    # Delete empty user folder
-    user_folder_path = user_folder(userid)
-    try:
-        if user_folder_path.exists():
-            user_folder_path.rmdir()
-    except OSError:
-        pass
 
     # Clear session
     session.clear()
