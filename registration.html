@@ -3,6 +3,9 @@
 <head>
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+	<meta http-equiv="Pragma" content="no-cache" />
+	<meta http-equiv="Expires" content="0" />
 	<title>CryptoSafe Registration</title>
 	<style>
 		:root {
@@ -42,7 +45,7 @@
 			display: grid;
 			grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
 			gap: 20px;
-			align-items: center;
+			align-items: stretch;
 		}
 
 		.hero,
@@ -52,7 +55,14 @@
 			border-radius: 24px;
 			box-shadow: 0 22px 60px rgba(0, 0, 0, 0.32);
 			backdrop-filter: blur(14px);
+			display: flex;
+			flex-direction: column;
+			justify-content: space-between;
 		}
+
+		/* Keep hero compact and anchored at top; let card fill remaining height */
+		.hero { align-self: start; min-height: auto; }
+		.card { min-height: 420px; }
 
 		.hero {
 			padding: 28px;
@@ -117,6 +127,14 @@
 		.card {
 			padding: 28px;
 		}
+
+			/* Auth option cards */
+			.auth-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap:12px; margin-bottom:12px }
+			.option-card { background: rgba(255,255,255,0.03); border:1px solid rgba(166,180,194,0.08); padding:12px; border-radius:12px; cursor:pointer; display:flex; gap:12px; align-items:center }
+			.option-card .icon { width:48px; height:48px; display:inline-flex; align-items:center; justify-content:center; color:var(--accent-2); }
+			.option-card.selected { border-color: rgba(94,234,212,0.6); box-shadow:0 6px 18px rgba(56,189,248,0.06) }
+			.option-card .meta { color:var(--muted); font-size:0.92rem }
+			.option-card input[type="radio"]{ display:none }
 
 		h2 {
 			margin: 0 0 8px;
@@ -253,6 +271,83 @@
 			<div id="status" class="status"></div>
 
 			<form action="/register" method="POST">
+				<input id="biometricCredential" name="biometric_credential" type="hidden" />
+				<div class="field">
+					<label>Authentication method</label>
+					<div class="auth-grid">
+						<div class="option-card" data-value="biometric" id="opt-biometric">
+							<input type="radio" name="auth_method" value="biometric" checked />
+							<div class="icon" aria-hidden="true">
+								<!-- fingerprint icon (monochrome) -->
+								<svg viewBox="0 0 24 24" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 4.5l-1.5 2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 4.5l1.5 2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 10A7.5 7.5 0 0012 21a7.5 7.5 0 007.5-11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+							</div>
+							<div>
+								<strong>Use device biometric</strong>
+								<div class="meta">Register a passkey (fingerprint/face) on this device for quick unlock.</div>
+							</div>
+						</div>
+						<div class="option-card" data-value="passcode" id="opt-passcode">
+							<input type="radio" name="auth_method" value="passcode" />
+							<div class="icon" aria-hidden="true">
+								<!-- lock icon -->
+								<svg viewBox="0 0 24 24" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="10" width="16" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M8 10V7a4 4 0 118 0v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+							</div>
+							<div>
+								<strong>Set numeric passcode</strong>
+								<div class="meta">Fallback method for devices without biometrics. Use 4+ digits.</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="field">
+					<label>Preferred biometric modality (hint)</label>
+					<div class="auth-grid">
+						<div class="option-card" data-value="auto">
+							<input type="radio" name="biometric_type" value="auto" checked />
+							<div class="icon" aria-hidden="true">
+								<!-- target/auto icon -->
+								<svg viewBox="0 0 24 24" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M12 2v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M12 20v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M2 12h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M20 12h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+							</div>
+							<div>
+								<strong>Auto</strong>
+								<div class="meta">Use the best available biometric on your device.</div>
+							</div>
+						</div>
+						<div class="option-card" data-value="fingerprint">
+							<input type="radio" name="biometric_type" value="fingerprint" />
+							<div class="icon" aria-hidden="true">
+								<svg viewBox="0 0 24 24" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 4.5l-1.5 2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 4.5l1.5 2.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 10A7.5 7.5 0 0012 21a7.5 7.5 0 007.5-11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+							</div>
+							<div>
+								<strong>Fingerprint</strong>
+								<div class="meta">Prefer fingerprint if available.</div>
+							</div>
+						</div>
+						<div class="option-card" data-value="face">
+							<input type="radio" name="biometric_type" value="face" />
+							<div class="icon" aria-hidden="true">
+								<!-- face icon -->
+								<svg viewBox="0 0 24 24" width="36" height="36" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="2" stroke="currentColor" stroke-width="1.2"/><path d="M8 14c0-2 2-3.5 4-3.5s4 1.5 4 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+							</div>
+							<div>
+								<strong>Face ID</strong>
+								<div class="meta">Prefer face authentication if available.</div>
+							</div>
+						</div>
+					</div>
+					<p class="note">Note: browsers don't always expose modality; this is a hint and enrollment may still use the available authenticator.</p>
+				</div>
+				<div id="passcodeFields" style="display:none;">
+					<div class="field">
+						<label for="passcode">Passcode (4+ digits)</label>
+						<input id="passcode" name="passcode" type="password" minlength="4" maxlength="32" />
+					</div>
+					<div class="field">
+						<label for="passcode_confirm">Confirm Passcode</label>
+						<input id="passcode_confirm" name="passcode_confirm" type="password" minlength="4" maxlength="32" />
+					</div>
+				</div>
 				<div class="field">
 					<label for="userid">User ID</label>
 					<input id="userid" name="userid" type="text" minlength="3" maxlength="40" required />
@@ -268,7 +363,7 @@
 					<input id="confirm_password" name="confirm_password" type="password" minlength="6" maxlength="128" required />
 				</div>
 
-				<button type="submit">Create Account</button>
+				<button id="createAccountBtn" type="submit">Create Account</button>
 				<div class="links">
 					<a href="/login.html">Already have an account? Login</a>
 				</div>
@@ -277,14 +372,151 @@
 	</div>
 
 	<script>
+		function base64urlToBuffer(value) {
+			const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+			const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+			const binary = atob(padded);
+			const bytes = new Uint8Array(binary.length);
+			for (let i = 0; i < binary.length; i += 1) {
+				bytes[i] = binary.charCodeAt(i);
+			}
+			return bytes;
+		}
+
+		function bufferToBase64url(input) {
+			const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+			let binary = "";
+			for (const b of bytes) {
+				binary += String.fromCharCode(b);
+			}
+			return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+		}
+
+		function showInlineError(message) {
+			status.textContent = message;
+			status.className = "status show error";
+		}
+
+		async function createBiometricCredential(userid) {
+			const response = await fetch("/api/biometric/register/options", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ userid })
+			});
+
+			const options = await response.json();
+			if (!response.ok) {
+				throw new Error(options.error || "Unable to start biometric setup.");
+			}
+
+			options.challenge = base64urlToBuffer(options.challenge);
+			options.user.id = base64urlToBuffer(options.user.id);
+			if (Array.isArray(options.excludeCredentials)) {
+				options.excludeCredentials = options.excludeCredentials.map((item) => ({
+					...item,
+					id: base64urlToBuffer(item.id),
+				}));
+			}
+
+			const credential = await navigator.credentials.create({ publicKey: options });
+			if (!credential) {
+				throw new Error("Biometric setup was cancelled.");
+			}
+
+			return {
+				id: credential.id,
+				rawId: bufferToBase64url(credential.rawId),
+				type: credential.type,
+				response: {
+					attestationObject: bufferToBase64url(credential.response.attestationObject),
+					clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+					transports:
+						typeof credential.response.getTransports === "function"
+							? credential.response.getTransports()
+							: [],
+				},
+				clientExtensionResults: credential.getClientExtensionResults(),
+				authenticatorAttachment: credential.authenticatorAttachment || "platform",
+			};
+		}
+
 		const params = new URLSearchParams(window.location.search);
 		const error = params.get("error");
 		const status = document.getElementById("status");
+		const form = document.querySelector("form[action='/register']");
+		const createBtn = document.getElementById("createAccountBtn");
+		const userIdInput = document.getElementById("userid");
+		const biometricField = document.getElementById("biometricCredential");
+ 			const authRadios = document.querySelectorAll("input[name='auth_method']");
+ 			const passcodeFields = document.getElementById("passcodeFields");
+ 			const passcodeInput = document.getElementById("passcode");
+ 			const passcodeConfirmInput = document.getElementById("passcode_confirm");
+ 			const optionCards = document.querySelectorAll('.option-card');
+
+			optionCards.forEach(card=>{
+				card.addEventListener('click', ()=>{
+					const input = card.querySelector('input[type=radio]');
+					if(input){ input.checked = true; }
+					optionCards.forEach(c=>c.classList.remove('selected'));
+					card.classList.add('selected');
+					updateMethodUI();
+				});
+			});
 
 		if (error) {
-			status.textContent = error;
-			status.className = "status show error";
+			showInlineError(error);
 		}
+
+		function updateMethodUI() {
+			const method = document.querySelector("input[name='auth_method']:checked").value;
+			if (method === "passcode") {
+				passcodeFields.style.display = "block";
+				createBtn.textContent = "Create Account";
+			} else {
+				passcodeFields.style.display = "none";
+				createBtn.textContent = "Create Account";
+			}
+		}
+
+		authRadios.forEach(r => r.addEventListener('change', updateMethodUI));
+		updateMethodUI();
+
+		form.addEventListener("submit", async (event) => {
+			event.preventDefault();
+
+			const userid = userIdInput.value.trim();
+			if (userid.length < 3) {
+				showInlineError("User ID must be at least 3 characters.");
+				return;
+			}
+
+			const method = document.querySelector("input[name='auth_method']:checked").value;
+			if (method === 'passcode') {
+				if (!passcodeInput.value || passcodeInput.value !== passcodeConfirmInput.value || passcodeInput.value.length < 4) {
+					showInlineError('Passcode required, must match, and be at least 4 characters.');
+					return;
+				}
+				form.submit();
+				return;
+			}
+
+			if (!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create)) {
+				showInlineError("This browser or device does not support biometric passkeys. Choose 'Set a numeric passcode' instead.");
+				return;
+			}
+
+			createBtn.disabled = true;
+			createBtn.textContent = "Waiting for biometric approval...";
+			try {
+				const credential = await createBiometricCredential(userid);
+				biometricField.value = JSON.stringify(credential);
+				form.submit();
+			} catch (setupError) {
+				showInlineError(setupError.message || "Biometric setup failed.");
+				createBtn.disabled = false;
+				createBtn.textContent = "Create Account";
+			}
+		});
 	</script>
 </body>
 </html>

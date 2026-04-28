@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import io
+import json
 import os
 import re
 import sqlite3
@@ -12,6 +13,21 @@ from urllib.parse import urlencode
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from flask import Flask, jsonify, redirect, request, send_file, send_from_directory, session
+from webauthn import (
+    base64url_to_bytes,
+    generate_authentication_options,
+    generate_registration_options,
+    options_to_json,
+    verify_authentication_response,
+    verify_registration_response,
+)
+from webauthn.helpers.structs import (
+    AuthenticatorAttachment,
+    AuthenticatorSelectionCriteria,
+    PublicKeyCredentialDescriptor,
+    ResidentKeyRequirement,
+    UserVerificationRequirement,
+)
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 
@@ -166,6 +182,24 @@ def init_db() -> None:
             conn.execute("ALTER TABLE users ADD COLUMN locked_until TEXT")
         if "last_failed_at" not in user_columns:
             conn.execute("ALTER TABLE users ADD COLUMN last_failed_at TEXT")
+        if "webauthn_credential_id" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN webauthn_credential_id TEXT")
+        if "webauthn_public_key" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN webauthn_public_key TEXT")
+        if "webauthn_sign_count" not in user_columns:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN webauthn_sign_count INTEGER NOT NULL DEFAULT 0"
+            )
+        if "biometric_failed_attempts" not in user_columns:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN biometric_failed_attempts INTEGER NOT NULL DEFAULT 0"
+            )
+        if "biometric_locked_until" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN biometric_locked_until TEXT")
+        if "biometric_last_failed_at" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN biometric_last_failed_at TEXT")
+        if "passcode_hash" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN passcode_hash TEXT NOT NULL DEFAULT ''")
 
         file_columns = {
             row[1] for row in conn.execute("PRAGMA table_info(user_files)").fetchall()
@@ -219,6 +253,10 @@ def build_login_url(error: str | None = None) -> str:
     return build_url("/login.html", error=error)
 
 
+def build_biometric_url(error: str | None = None) -> str:
+    return build_url("/biometric.html", error=error)
+
+
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -243,6 +281,24 @@ def payload_value(name: str) -> str:
 def payload_bool(name: str) -> bool:
     value = payload_value(name).strip().lower()
     return value in {"1", "true", "yes", "on"}
+
+
+def encode_base64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def relying_party_id() -> str:
+    host = request.host.split(":", 1)[0].strip().lower()
+    if host == "127.0.0.1":
+        host = "localhost"
+    return host
+
+
+def expected_origin() -> str:
+    origin = request.host_url.rstrip("/")
+    if "127.0.0.1" in origin:
+        origin = origin.replace("127.0.0.1", "localhost")
+    return origin
 
 
 def uploaded_file_from_request(field_name: str = "upload_file"):
@@ -299,6 +355,7 @@ def apply_no_store_headers(response):
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
+    response.headers["ETag"] = None
     return response
 
 
@@ -323,9 +380,39 @@ def login_page():
     return response
 
 
+@app.post("/start_login")
+def start_login():
+    userid = (request.form.get("userid") or "").strip()
+    if not userid:
+        return redirect(build_login_url("User ID is required."))
+
+    with db_connection() as conn:
+        user = conn.execute(
+            "SELECT userid FROM users WHERE userid = ?",
+            (userid,),
+        ).fetchone()
+    if user is None:
+        return redirect(build_login_url("Invalid user ID."))
+
+    session["pending_user_id"] = userid
+    session.pop("biometric_challenge", None)
+    session.pop("biometric_verified", None)
+    return redirect("/biometric.html")
+
+
 @app.get("/landing.html")
 def landing_page():
     response = send_from_directory(BASE_DIR, "landing.html")
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.get("/biometric.html")
+def biometric_page():
+    if not session.get("pending_user_id"):
+        return redirect(build_login_url("Please complete password sign in first."))
+
+    response = send_from_directory(BASE_DIR, "biometric.html")
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -351,6 +438,10 @@ def register_user():
     userid = (request.form.get("userid") or "").strip()
     password = request.form.get("password") or ""
     confirm_password = request.form.get("confirm_password") or ""
+    biometric_credential_raw = request.form.get("biometric_credential") or ""
+    auth_method = (request.form.get("auth_method") or "biometric").strip()
+    passcode = request.form.get("passcode") or ""
+    passcode_confirm = request.form.get("passcode_confirm") or ""
 
     if not userid or not password:
         return redirect(build_registration_url("User ID and password are required."))
@@ -365,21 +456,231 @@ def register_user():
             )
         )
 
+    # Support two enrollment methods: biometric (webauthn) or passcode fallback
     password_hash = generate_password_hash(password)
     created_at = now_utc().isoformat()
+
+    if auth_method == "passcode":
+        if not passcode or passcode != passcode_confirm or len(passcode) < 4:
+            return redirect(build_registration_url("Passcode required, must match and be at least 4 characters."))
+        passcode_hash = generate_password_hash(passcode)
+
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.execute(
+                    "INSERT INTO users (userid, password_hash, created_at, passcode_hash) VALUES (?, ?, ?, ?)",
+                    (userid, password_hash, created_at, passcode_hash),
+                )
+        except sqlite3.IntegrityError:
+            return redirect(build_registration_url("User ID already taken"))
+        except sqlite3.Error:
+            return redirect(build_registration_url("Database error. Please retry."))
+
+        return redirect(build_landing_url("success"))
+
+    # Default: biometric enrollment
+    if session.get("registration_userid") != userid:
+        return redirect(
+            build_registration_url(
+                "Biometric setup expired or mismatched. Please try registration again."
+            )
+        )
+
+    challenge_b64 = session.get("registration_challenge")
+    if not challenge_b64 or not biometric_credential_raw:
+        return redirect(
+            build_registration_url(
+                "Biometric setup is required. Use a device that supports biometrics/passkeys."
+            )
+        )
+
+    try:
+        biometric_credential = json.loads(biometric_credential_raw)
+        registration_verification = verify_registration_response(
+            credential=biometric_credential,
+            expected_challenge=base64url_to_bytes(challenge_b64),
+            expected_rp_id=relying_party_id(),
+            expected_origin=expected_origin(),
+            require_user_verification=True,
+        )
+    except Exception:
+        return redirect(
+            build_registration_url(
+                "Biometric registration failed. Please retry and approve biometric verification."
+            )
+        )
+
+    credential_id = encode_base64url(registration_verification.credential_id)
+    public_key = encode_base64url(registration_verification.credential_public_key)
+    sign_count = int(registration_verification.sign_count)
 
     try:
         with sqlite3.connect(DB_PATH) as conn:
             conn.execute(
-                "INSERT INTO users (userid, password_hash, created_at) VALUES (?, ?, ?)",
-                (userid, password_hash, created_at),
+                """
+                INSERT INTO users (
+                    userid,
+                    password_hash,
+                    created_at,
+                    webauthn_credential_id,
+                    webauthn_public_key,
+                    webauthn_sign_count
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    userid,
+                    password_hash,
+                    created_at,
+                    credential_id,
+                    public_key,
+                    sign_count,
+                ),
             )
     except sqlite3.IntegrityError:
         return redirect(build_registration_url("User ID already taken"))
     except sqlite3.Error:
         return redirect(build_registration_url("Database error. Please retry."))
 
+    session.pop("registration_challenge", None)
+    session.pop("registration_userid", None)
+
     return redirect(build_landing_url("success"))
+
+
+@app.post("/api/biometric/register/options")
+def biometric_register_options():
+    userid = payload_value("userid").strip()
+    if len(userid) < 3:
+        return jsonify({"error": "User ID must be at least 3 characters."}), 400
+
+    with db_connection() as conn:
+        existing = conn.execute(
+            "SELECT userid FROM users WHERE userid = ?",
+            (userid,),
+        ).fetchone()
+    if existing is not None:
+        return jsonify({"error": "User ID already taken."}), 409
+
+    options = generate_registration_options(
+        rp_id=relying_party_id(),
+        rp_name="CryptoSafe",
+        user_id=os.urandom(16),
+        user_name=userid,
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            authenticator_attachment=AuthenticatorAttachment.PLATFORM,
+            resident_key=ResidentKeyRequirement.REQUIRED,
+            user_verification=UserVerificationRequirement.REQUIRED,
+        ),
+    )
+
+    session["registration_challenge"] = encode_base64url(options.challenge)
+    session["registration_userid"] = userid
+
+    return jsonify(json.loads(options_to_json(options)))
+
+
+@app.get('/settings.html')
+def settings_page():
+    if not session_user():
+        return redirect(build_login_url("Please sign in to manage settings."))
+    response = send_from_directory(BASE_DIR, 'settings.html')
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@app.post('/api/account/webauthn/register/options')
+def account_webauthn_register_options():
+    userid = session_user()
+    if not userid:
+        return jsonify({"error": "Not signed in."}), 401
+
+    options = generate_registration_options(
+        rp_id=relying_party_id(),
+        rp_name='CryptoSafe',
+        user_id=userid.encode('utf-8'),
+        user_name=userid,
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            authenticator_attachment=AuthenticatorAttachment.PLATFORM,
+            resident_key=ResidentKeyRequirement.REQUIRED,
+            user_verification=UserVerificationRequirement.REQUIRED,
+        ),
+    )
+
+    session['account_registration_challenge'] = encode_base64url(options.challenge)
+    return jsonify(json.loads(options_to_json(options)))
+
+
+@app.post('/api/account/webauthn/register/verify')
+def account_webauthn_register_verify():
+    userid = session_user()
+    if not userid:
+        return jsonify({"error": "Not signed in."}), 401
+
+    payload = request.get_json(silent=True) or {}
+    credential = payload.get('credential')
+    challenge_b64 = session.get('account_registration_challenge')
+    if not credential or not challenge_b64:
+        return jsonify({"error": "Missing credential or challenge."}), 400
+
+    try:
+        verification = verify_registration_response(
+            credential=credential,
+            expected_challenge=base64url_to_bytes(challenge_b64),
+            expected_rp_id=relying_party_id(),
+            expected_origin=expected_origin(),
+            require_user_verification=True,
+        )
+    except Exception:
+        return jsonify({"error": "Registration verification failed."}), 400
+
+    credential_id = encode_base64url(verification.credential_id)
+    public_key = encode_base64url(verification.credential_public_key)
+    sign_count = int(verification.sign_count)
+
+    with db_connection() as conn:
+        conn.execute(
+            'UPDATE users SET webauthn_credential_id = ?, webauthn_public_key = ?, webauthn_sign_count = ? WHERE userid = ?',
+            (credential_id, public_key, sign_count, userid),
+        )
+
+    session.pop('account_registration_challenge', None)
+    return jsonify({"message": "Passkey registered."})
+
+
+@app.post('/api/account/set_passcode')
+def account_set_passcode():
+    userid = session_user()
+    if not userid:
+        return jsonify({"error": "Not signed in."}), 401
+    payload = request.get_json(silent=True) or {}
+    passcode = str(payload.get('passcode') or '').strip()
+    if len(passcode) < 4:
+        return jsonify({"error": "Passcode must be at least 4 characters."}), 400
+    passcode_hash = generate_password_hash(passcode)
+    with db_connection() as conn:
+        conn.execute('UPDATE users SET passcode_hash = ? WHERE userid = ?', (passcode_hash, userid))
+    return jsonify({"message": "Passcode set."})
+
+
+@app.post('/api/account/remove_webauthn')
+def account_remove_webauthn():
+    userid = session_user()
+    if not userid:
+        return jsonify({"error": "Not signed in."}), 401
+    with db_connection() as conn:
+        conn.execute('UPDATE users SET webauthn_credential_id = NULL, webauthn_public_key = NULL, webauthn_sign_count = 0 WHERE userid = ?', (userid,))
+    return jsonify({"message": "Passkey removed."})
+
+
+@app.post('/api/account/remove_passcode')
+def account_remove_passcode():
+    userid = session_user()
+    if not userid:
+        return jsonify({"error": "Not signed in."}), 401
+    with db_connection() as conn:
+        conn.execute('UPDATE users SET passcode_hash = "" WHERE userid = ?', (userid,))
+    return jsonify({"message": "Passcode removed."})
 
 
 @app.post("/login")
@@ -394,7 +695,8 @@ def login_user():
         with db_connection() as conn:
             user = conn.execute(
                 """
-                SELECT userid, password_hash, failed_attempts, locked_until
+                SELECT userid, password_hash, failed_attempts, locked_until,
+                       webauthn_credential_id
                 FROM users
                 WHERE userid = ?
                 """,
@@ -415,6 +717,13 @@ def login_user():
                 )
 
             if check_password_hash(user["password_hash"], password):
+                if not user["webauthn_credential_id"]:
+                    return redirect(
+                        build_login_url(
+                            "This account has no biometric credential enrolled. Please re-register to enable two-phase login."
+                        )
+                    )
+
                 conn.execute(
                     """
                     UPDATE users
@@ -425,8 +734,10 @@ def login_user():
                     """,
                     (userid,),
                 )
-                session["user_id"] = userid
-                return redirect("/dashboard.html")
+                session.pop("user_id", None)
+                session["pending_user_id"] = userid
+                session.pop("biometric_challenge", None)
+                return redirect("/biometric.html")
 
             failed_attempts = int(user["failed_attempts"] or 0) + 1
             lock_until_value = None
@@ -454,6 +765,221 @@ def login_user():
                 (failed_attempts, lock_until_value, current_time.isoformat(), userid),
             )
 
+    except sqlite3.Error:
+        return redirect(build_login_url("Database error. Please retry."))
+
+    return redirect(build_login_url(message))
+
+
+@app.post("/api/biometric/auth/options")
+def biometric_auth_options():
+    userid = session.get("pending_user_id")
+    if not userid:
+        return jsonify({"error": "Start login first."}), 401
+
+    with db_connection() as conn:
+        user = conn.execute(
+            """
+            SELECT webauthn_credential_id, passcode_hash, biometric_locked_until
+            FROM users
+            WHERE userid = ?
+            """,
+            (userid,),
+        ).fetchone()
+    if user is None:
+        return jsonify({"error": "Account not found."}), 404
+
+    # Check biometric lockout
+    locked_until = parse_utc(user["biometric_locked_until"]) if user["biometric_locked_until"] else None
+    now = now_utc()
+    if locked_until and locked_until > now:
+        return jsonify({"error": "Biometric locked due to repeated failures."}), 403
+
+    has_webauthn = bool(user["webauthn_credential_id"])
+    has_passcode = bool(user["passcode_hash"])
+
+    if not has_webauthn and not has_passcode:
+        return jsonify({"error": "No biometric or passcode configured for this account."}), 400
+
+    result = {"webauthn": has_webauthn, "passcode": has_passcode}
+
+    if has_webauthn:
+        options = generate_authentication_options(
+            rp_id=relying_party_id(),
+            allow_credentials=[
+                PublicKeyCredentialDescriptor(
+                    id=base64url_to_bytes(str(user["webauthn_credential_id"])),
+                )
+            ],
+            user_verification=UserVerificationRequirement.REQUIRED,
+        )
+        session["biometric_challenge"] = encode_base64url(options.challenge)
+        result.update(json.loads(options_to_json(options)))
+
+    return jsonify(result)
+
+
+@app.post("/api/biometric/auth/verify")
+def biometric_auth_verify():
+    userid = session.get("pending_user_id")
+    challenge_b64 = session.get("biometric_challenge")
+    if not userid or not challenge_b64:
+        # allow passcode verification even if we didn't issue a webauthn challenge
+        pass
+
+    payload = request.get_json(silent=True)
+    credential = None
+    passcode = None
+    if isinstance(payload, dict):
+        credential = payload.get("credential")
+        passcode = payload.get("passcode")
+
+    with db_connection() as conn:
+        user = conn.execute(
+            "SELECT webauthn_public_key, webauthn_sign_count, biometric_failed_attempts FROM users WHERE userid = ?",
+            (userid,),
+        ).fetchone()
+
+        if user is None:
+            return jsonify({"error": "Account not found."}), 404
+
+        # Passcode path
+        if passcode is not None:
+            stored = conn.execute(
+                "SELECT passcode_hash, biometric_failed_attempts FROM users WHERE userid = ?",
+                (userid,),
+            ).fetchone()
+            if not stored or not stored["passcode_hash"]:
+                return jsonify({"error": "Passcode not configured for this account."}), 400
+
+            if not check_password_hash(stored["passcode_hash"], passcode):
+                # increment biometric failures
+                current = int(stored["biometric_failed_attempts"] or 0) + 1
+                lock_until_val = None
+                if current >= MAX_FAILED_ATTEMPTS:
+                    lock_until = now_utc() + LOCKOUT_DURATION
+                    lock_until_val = lock_until.isoformat()
+                    current = MAX_FAILED_ATTEMPTS
+                conn.execute(
+                    "UPDATE users SET biometric_failed_attempts = ?, biometric_locked_until = ?, biometric_last_failed_at = ? WHERE userid = ?",
+                    (current, lock_until_val, now_utc().isoformat(), userid),
+                )
+                return jsonify({"error": "Passcode verification failed."}), 403
+
+            # success
+            conn.execute(
+                "UPDATE users SET biometric_failed_attempts = 0, biometric_locked_until = NULL, biometric_last_failed_at = NULL WHERE userid = ?",
+                (userid,),
+            )
+            session["biometric_verified"] = True
+            return jsonify({"message": "Biometric/passcode verification completed.", "redirect": "/password.html"})
+
+        # WebAuthn credential path
+        if credential is None:
+            return jsonify({"error": "Missing biometric credential payload."}), 400
+
+        if not user["webauthn_public_key"]:
+            return jsonify({"error": "Biometric credential is not configured for this account."}), 400
+
+        try:
+            verification = verify_authentication_response(
+                credential=credential,
+                expected_challenge=base64url_to_bytes(challenge_b64),
+                expected_rp_id=relying_party_id(),
+                expected_origin=expected_origin(),
+                credential_public_key=base64url_to_bytes(str(user["webauthn_public_key"])),
+                credential_current_sign_count=int(user["webauthn_sign_count"] or 0),
+                require_user_verification=True,
+            )
+        except Exception:
+            # increment biometric failure counter
+            current_fail = int(user["biometric_failed_attempts"] or 0) + 1
+            lock_until_val = None
+            if current_fail >= MAX_FAILED_ATTEMPTS:
+                lock_until = now_utc() + LOCKOUT_DURATION
+                lock_until_val = lock_until.isoformat()
+                current_fail = MAX_FAILED_ATTEMPTS
+            conn.execute(
+                "UPDATE users SET biometric_failed_attempts = ?, biometric_locked_until = ?, biometric_last_failed_at = ? WHERE userid = ?",
+                (current_fail, lock_until_val, now_utc().isoformat(), userid),
+            )
+            return jsonify({"error": "Biometric verification failed."}), 403
+
+        # success: reset biometric counters and mark verified for password phase
+        conn.execute(
+            "UPDATE users SET webauthn_sign_count = ?, biometric_failed_attempts = 0, biometric_locked_until = NULL, biometric_last_failed_at = NULL WHERE userid = ?",
+            (int(verification.new_sign_count), userid),
+        )
+
+    session["biometric_verified"] = True
+    session.pop("biometric_challenge", None)
+    return jsonify({"message": "Biometric verification completed.", "redirect": "/password.html"})
+
+
+@app.get("/password.html")
+def password_page():
+    if not session.get("pending_user_id") or not session.get("biometric_verified"):
+        return redirect(build_login_url("Complete the biometric/passcode step first."))
+
+    response = send_from_directory(BASE_DIR, "password.html")
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.post("/complete_login")
+def complete_login():
+    userid = session.get("pending_user_id")
+    if not userid or not session.get("biometric_verified"):
+        return redirect(build_login_url("Session expired. Please login again."))
+
+    password = request.form.get("password") or ""
+    if not password:
+        return redirect(build_login_url("Password is required."))
+
+    try:
+        with db_connection() as conn:
+            user = conn.execute(
+                "SELECT userid, password_hash, failed_attempts, locked_until FROM users WHERE userid = ?",
+                (userid,),
+            ).fetchone()
+
+            if user is None:
+                return redirect(build_login_url("Invalid user."))
+
+            locked_until = parse_utc(user["locked_until"])
+            current_time = now_utc()
+            if locked_until and locked_until > current_time:
+                remaining_hours = max(1, int((locked_until - current_time).total_seconds() // 3600))
+                return redirect(build_login_url(f"Password locked due to repeated failures. Try again in about {remaining_hours} hour(s)."))
+
+            if check_password_hash(user["password_hash"], password):
+                # success: clear password failure counters and complete login
+                conn.execute(
+                    "UPDATE users SET failed_attempts = 0, locked_until = NULL, last_failed_at = NULL WHERE userid = ?",
+                    (userid,),
+                )
+                session["user_id"] = userid
+                session.pop("pending_user_id", None)
+                session.pop("biometric_verified", None)
+                return redirect("/dashboard.html")
+
+            # password failure path
+            failed_attempts = int(user["failed_attempts"] or 0) + 1
+            lock_until_value = None
+            message = "Invalid password."
+            if failed_attempts >= MAX_FAILED_ATTEMPTS:
+                lock_until = current_time + LOCKOUT_DURATION
+                lock_until_value = lock_until.isoformat()
+                failed_attempts = MAX_FAILED_ATTEMPTS
+                message = "Account locked for 24 hours after too many failed password attempts."
+            else:
+                remaining_attempts = MAX_FAILED_ATTEMPTS - failed_attempts
+                message = f"Invalid password. {remaining_attempts} attempt(s) left before a 24-hour lock."
+
+            conn.execute(
+                "UPDATE users SET failed_attempts = ?, locked_until = ?, last_failed_at = ? WHERE userid = ?",
+                (failed_attempts, lock_until_value, current_time.isoformat(), userid),
+            )
     except sqlite3.Error:
         return redirect(build_login_url("Database error. Please retry."))
 
@@ -836,6 +1362,34 @@ def delete_user_file(file_id: int):
 
     return jsonify({"message": "File deleted successfully."})
 
+
+@app.post('/admin/wipe_all')
+def admin_wipe_all():
+    """Dangerous: wipe all users and user files from the database.
+
+    This endpoint is protected by an environment token `ADMIN_WIPE_TOKEN`.
+    Callers must supply the same token in the `X-ADMIN-TOKEN` header or
+    as form field `admin_token` to authorize the wipe.
+    """
+    # Require an admin token to avoid accidental data loss.
+    provided = (request.headers.get('X-ADMIN-TOKEN') or request.form.get('admin_token') or "").strip()
+    expected = os.environ.get('ADMIN_WIPE_TOKEN', '').strip()
+    if not expected:
+        return jsonify({"error": "Admin wipe token not configured on server."}), 403
+    if not provided or provided != expected:
+        return jsonify({"error": "Invalid admin token."}), 403
+
+    try:
+        with db_connection() as conn:
+            conn.execute('DELETE FROM user_files')
+            conn.execute('DELETE FROM users')
+    except sqlite3.Error:
+        return jsonify({"error": "Database error while wiping data."}), 500
+
+    # Re-initialize DB schema to ensure default columns exist after wipe.
+    init_db()
+    return jsonify({"message": "All user accounts and files have been erased."})
+
 @app.post("/api/account/delete")
 def delete_account():
     auth_error = json_auth_required()
@@ -866,4 +1420,4 @@ print("Serving from:", BASE_DIR)
 
 if __name__ == "__main__":
     init_db()
-    app.run(debug=True)
+    app.run(debug=True, host="localhost", port=5000)

@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>CryptoSafe Login</title>
   <style>
     :root {
@@ -203,7 +206,7 @@
     <section class="hero">
       <div class="eyebrow">Secure access</div>
       <h1>Sign in to your CryptoSafe dashboard.</h1>
-      <p class="lede">Access your secure bank details and password vault from a single dashboard. Wrong password attempts are tracked and the account is locked for 24 hours after repeated failures.</p>
+      <p class="lede">Access your secure bank details and password vault from a single dashboard.</p>
 
       <div class="grid">
         <div class="tile">
@@ -219,25 +222,20 @@
 
     <main class="panel">
       <div id="status" class="status"></div>
-      <form action="/login" method="POST">
+      <form action="/start_login" method="POST">
         <div class="field">
           <label for="userid">User ID</label>
           <input id="userid" name="userid" type="text" minlength="3" maxlength="40" required />
         </div>
 
-        <div class="field">
-          <label for="password">Password</label>
-          <input id="password" name="password" type="password" minlength="6" maxlength="128" required />
-        </div>
-
-        <button type="submit">Login</button>
+        <button type="submit">Continue to biometric</button>
       </form>
 
       <div class="actions">
         <a class="link" href="/registration.html">Create account</a>
       </div>
 
-      <p class="hint">After 3 failed password attempts, the account is locked for 24 hours.</p>
+      <p class="hint">Sign-in is two-phase: biometric/passcode first, then account password. After 3 failed attempts per phase, that phase locks for 24 hours.</p>
     </main>
   </div>
 
