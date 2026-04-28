@@ -363,6 +363,30 @@
 					<input id="confirm_password" name="confirm_password" type="password" minlength="6" maxlength="128" required />
 				</div>
 
+				<div class="field">
+					<label for="backup_question">Backup Security Question</label>
+					<input
+						id="backup_question"
+						name="backup_question"
+						type="text"
+						maxlength="160"
+						placeholder="Example: What was the name of your first school?"
+						required
+					/>
+				</div>
+
+				<div class="field">
+					<label for="backup_answer">Backup Answer</label>
+					<input
+						id="backup_answer"
+						name="backup_answer"
+						type="password"
+						minlength="2"
+						maxlength="128"
+						required
+					/>
+				</div>
+
 				<button id="createAccountBtn" type="submit">Create Account</button>
 				<div class="links">
 					<a href="/login.html">Already have an account? Login</a>
@@ -491,6 +515,11 @@
 			}
 
 			const method = document.querySelector("input[name='auth_method']:checked").value;
+			const backupAnswerInput = document.getElementById("backup_answer");
+			if (!backupAnswerInput.value || backupAnswerInput.value.trim().length < 2) {
+				showInlineError("Backup answer must be at least 2 characters.");
+				return;
+			}
 			if (method === 'passcode') {
 				if (!passcodeInput.value || passcodeInput.value !== passcodeConfirmInput.value || passcodeInput.value.length < 4) {
 					showInlineError('Passcode required, must match, and be at least 4 characters.');

@@ -200,6 +200,16 @@ def init_db() -> None:
             conn.execute("ALTER TABLE users ADD COLUMN biometric_last_failed_at TEXT")
         if "passcode_hash" not in user_columns:
             conn.execute("ALTER TABLE users ADD COLUMN passcode_hash TEXT NOT NULL DEFAULT ''")
+        if "backup_question" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN backup_question TEXT NOT NULL DEFAULT ''")
+        if "backup_answer_hash" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN backup_answer_hash TEXT NOT NULL DEFAULT ''")
+        if "recovery_question_failed_attempts" not in user_columns:
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN recovery_question_failed_attempts INTEGER NOT NULL DEFAULT 0"
+            )
+        if "recovery_question_locked_until" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN recovery_question_locked_until TEXT")
 
         file_columns = {
             row[1] for row in conn.execute("PRAGMA table_info(user_files)").fetchall()
@@ -251,6 +261,10 @@ def build_registration_url(error: str | None = None) -> str:
 
 def build_login_url(error: str | None = None) -> str:
     return build_url("/login.html", error=error)
+
+
+def build_forgot_url(error: str | None = None, info: str | None = None) -> str:
+    return build_url("/forgot-password.html", error=error, info=info)
 
 
 def build_biometric_url(error: str | None = None) -> str:
@@ -339,6 +353,12 @@ def verify_user_password(userid: str, password: str) -> bool:
     return check_password_hash(row["password_hash"], password)
 
 
+def clear_recovery_session() -> None:
+    session.pop("recovery_user_id", None)
+    session.pop("recovery_biometric_challenge", None)
+    session.pop("recovery_alt_verified", None)
+
+
 def json_auth_required():
     if not session_user():
         return jsonify({"error": "Please sign in first."}), 401
@@ -376,6 +396,13 @@ def registration_page():
 @app.get("/login.html")
 def login_page():
     response = send_from_directory(BASE_DIR, "login.html")
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.get("/forgot-password.html")
+def forgot_password_page():
+    response = send_from_directory(BASE_DIR, "forgot-password.html")
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -442,6 +469,8 @@ def register_user():
     auth_method = (request.form.get("auth_method") or "biometric").strip()
     passcode = request.form.get("passcode") or ""
     passcode_confirm = request.form.get("passcode_confirm") or ""
+    backup_question = (request.form.get("backup_question") or "").strip()
+    backup_answer = (request.form.get("backup_answer") or "").strip()
 
     if not userid or not password:
         return redirect(build_registration_url("User ID and password are required."))
@@ -456,8 +485,14 @@ def register_user():
             )
         )
 
+    if not backup_question or len(backup_answer) < 2:
+        return redirect(
+            build_registration_url("Backup question and answer are required for recovery.")
+        )
+
     # Support two enrollment methods: biometric (webauthn) or passcode fallback
     password_hash = generate_password_hash(password)
+    backup_answer_hash = generate_password_hash(backup_answer)
     created_at = now_utc().isoformat()
 
     if auth_method == "passcode":
@@ -468,8 +503,25 @@ def register_user():
         try:
             with sqlite3.connect(DB_PATH) as conn:
                 conn.execute(
-                    "INSERT INTO users (userid, password_hash, created_at, passcode_hash) VALUES (?, ?, ?, ?)",
-                    (userid, password_hash, created_at, passcode_hash),
+                    """
+                    INSERT INTO users (
+                        userid,
+                        password_hash,
+                        created_at,
+                        passcode_hash,
+                        backup_question,
+                        backup_answer_hash
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        userid,
+                        password_hash,
+                        created_at,
+                        passcode_hash,
+                        backup_question,
+                        backup_answer_hash,
+                    ),
                 )
         except sqlite3.IntegrityError:
             return redirect(build_registration_url("User ID already taken"))
@@ -524,9 +576,11 @@ def register_user():
                     created_at,
                     webauthn_credential_id,
                     webauthn_public_key,
-                    webauthn_sign_count
+                    webauthn_sign_count,
+                    backup_question,
+                    backup_answer_hash
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     userid,
@@ -535,6 +589,8 @@ def register_user():
                     credential_id,
                     public_key,
                     sign_count,
+                    backup_question,
+                    backup_answer_hash,
                 ),
             )
     except sqlite3.IntegrityError:
@@ -984,6 +1040,312 @@ def complete_login():
         return redirect(build_login_url("Database error. Please retry."))
 
     return redirect(build_login_url(message))
+
+
+@app.post("/api/forgot/context")
+def forgot_context():
+    userid = payload_value("userid").strip()
+    if not userid:
+        return jsonify({"error": "User ID is required."}), 400
+
+    with db_connection() as conn:
+        user = conn.execute(
+            """
+            SELECT userid, failed_attempts, locked_until, passcode_hash,
+                   webauthn_credential_id, backup_question, backup_answer_hash
+            FROM users
+            WHERE userid = ?
+            """,
+            (userid,),
+        ).fetchone()
+
+    if user is None:
+        return jsonify({"error": "Invalid user ID."}), 404
+
+    locked_until = parse_utc(user["locked_until"])
+    current_time = now_utc()
+    if locked_until and locked_until > current_time:
+        return (
+            jsonify(
+                {
+                    "error": "Forgot password is disabled after 24-hour lock activates. Wait for lock expiry.",
+                }
+            ),
+            403,
+        )
+
+    if not user["backup_question"] or not user["backup_answer_hash"]:
+        return jsonify({"error": "Recovery question is not configured for this account."}), 400
+
+    has_webauthn = bool(user["webauthn_credential_id"])
+    has_passcode = bool(user["passcode_hash"])
+    if not has_webauthn and not has_passcode:
+        return jsonify({"error": "No biometric or PIN passcode is configured for this account."}), 400
+
+    clear_recovery_session()
+    session["recovery_user_id"] = userid
+
+    with db_connection() as conn:
+        conn.execute(
+            """
+            UPDATE users
+            SET recovery_question_failed_attempts = 0,
+                recovery_question_locked_until = NULL
+            WHERE userid = ?
+            """,
+            (userid,),
+        )
+
+    return jsonify(
+        {
+            "userid": userid,
+            "backup_question": user["backup_question"],
+            "has_webauthn": has_webauthn,
+            "has_passcode": has_passcode,
+        }
+    )
+
+
+@app.post("/api/forgot/biometric/options")
+def forgot_biometric_options():
+    userid = session.get("recovery_user_id")
+    if not userid:
+        return jsonify({"error": "Start password recovery first."}), 401
+
+    with db_connection() as conn:
+        user = conn.execute(
+            "SELECT webauthn_credential_id, locked_until FROM users WHERE userid = ?",
+            (userid,),
+        ).fetchone()
+
+    if user is None:
+        return jsonify({"error": "Invalid user."}), 404
+
+    locked_until = parse_utc(user["locked_until"])
+    if locked_until and locked_until > now_utc():
+        return (
+            jsonify(
+                {
+                    "error": "Forgot password is disabled after 24-hour lock activates. Wait for lock expiry.",
+                }
+            ),
+            403,
+        )
+
+    if not user["webauthn_credential_id"]:
+        return jsonify({"error": "Biometric is not configured for this account."}), 400
+
+    options = generate_authentication_options(
+        rp_id=relying_party_id(),
+        allow_credentials=[
+            PublicKeyCredentialDescriptor(
+                id=base64url_to_bytes(str(user["webauthn_credential_id"])),
+            )
+        ],
+        user_verification=UserVerificationRequirement.REQUIRED,
+    )
+
+    session["recovery_biometric_challenge"] = encode_base64url(options.challenge)
+    return jsonify(json.loads(options_to_json(options)))
+
+
+@app.post("/api/forgot/biometric/verify")
+def forgot_biometric_verify():
+    userid = session.get("recovery_user_id")
+    challenge_b64 = session.get("recovery_biometric_challenge")
+    payload = request.get_json(silent=True) or {}
+    credential = payload.get("credential")
+
+    if not userid or not challenge_b64:
+        return jsonify({"error": "Start password recovery first."}), 401
+    if credential is None:
+        return jsonify({"error": "Missing biometric credential payload."}), 400
+
+    with db_connection() as conn:
+        user = conn.execute(
+            """
+            SELECT webauthn_public_key, webauthn_sign_count, locked_until
+            FROM users
+            WHERE userid = ?
+            """,
+            (userid,),
+        ).fetchone()
+
+        if user is None:
+            return jsonify({"error": "Invalid user."}), 404
+
+        locked_until = parse_utc(user["locked_until"])
+        if locked_until and locked_until > now_utc():
+            return (
+                jsonify(
+                    {
+                        "error": "Forgot password is disabled after 24-hour lock activates. Wait for lock expiry.",
+                    }
+                ),
+                403,
+            )
+
+        if not user["webauthn_public_key"]:
+            return jsonify({"error": "Biometric is not configured for this account."}), 400
+
+        try:
+            verification = verify_authentication_response(
+                credential=credential,
+                expected_challenge=base64url_to_bytes(challenge_b64),
+                expected_rp_id=relying_party_id(),
+                expected_origin=expected_origin(),
+                credential_public_key=base64url_to_bytes(str(user["webauthn_public_key"])),
+                credential_current_sign_count=int(user["webauthn_sign_count"] or 0),
+                require_user_verification=True,
+            )
+        except Exception:
+            return jsonify({"error": "Biometric verification failed."}), 403
+
+        conn.execute(
+            "UPDATE users SET webauthn_sign_count = ? WHERE userid = ?",
+            (int(verification.new_sign_count), userid),
+        )
+
+    session["recovery_alt_verified"] = True
+    session.pop("recovery_biometric_challenge", None)
+    return jsonify({"message": "Biometric verified for recovery."})
+
+
+@app.post("/api/forgot/reset")
+def forgot_reset():
+    payload = request.get_json(silent=True) or {}
+    userid = str(payload.get("userid") or "").strip()
+    method = str(payload.get("method") or "").strip().lower()
+    passcode = str(payload.get("passcode") or "")
+    backup_answer = str(payload.get("backup_answer") or "").strip()
+    new_password = str(payload.get("new_password") or "")
+    confirm_password = str(payload.get("confirm_password") or "")
+
+    if not userid or not method or not backup_answer or not new_password:
+        return jsonify({"error": "All required fields must be provided."}), 400
+    if new_password != confirm_password:
+        return jsonify({"error": "New passwords do not match."}), 400
+    if len(new_password) < 6:
+        return jsonify({"error": "New password must be at least 6 characters."}), 400
+    if session.get("recovery_user_id") != userid:
+        return jsonify({"error": "Recovery session mismatch. Restart forgot password."}), 401
+
+    with db_connection() as conn:
+        user = conn.execute(
+            """
+            SELECT locked_until, passcode_hash, webauthn_credential_id,
+                   backup_answer_hash, recovery_question_failed_attempts,
+                   recovery_question_locked_until
+            FROM users
+            WHERE userid = ?
+            """,
+            (userid,),
+        ).fetchone()
+
+        if user is None:
+            clear_recovery_session()
+            return jsonify({"error": "Invalid user."}), 404
+
+        locked_until = parse_utc(user["locked_until"])
+        if locked_until and locked_until > now_utc():
+            clear_recovery_session()
+            return (
+                jsonify(
+                    {
+                        "error": "Forgot password is disabled after 24-hour lock activates. Wait for lock expiry.",
+                    }
+                ),
+                403,
+            )
+
+        recovery_locked_until = parse_utc(user["recovery_question_locked_until"])
+        current_time = now_utc()
+        if recovery_locked_until and recovery_locked_until > current_time:
+            clear_recovery_session()
+            return (
+                jsonify(
+                    {
+                        "error": "Backup question recovery is locked after 3 failed attempts. Try again later.",
+                        "locked_until": recovery_locked_until.isoformat(),
+                        "remaining_attempts": 0,
+                    }
+                ),
+                403,
+            )
+
+        if not user["backup_answer_hash"] or not check_password_hash(
+            user["backup_answer_hash"], backup_answer
+        ):
+            failed_attempts = int(user["recovery_question_failed_attempts"] or 0) + 1
+            lock_until_value = None
+            if failed_attempts >= MAX_FAILED_ATTEMPTS:
+                lock_until_value = (current_time + LOCKOUT_DURATION).isoformat()
+                failed_attempts = MAX_FAILED_ATTEMPTS
+
+            conn.execute(
+                """
+                UPDATE users
+                SET recovery_question_failed_attempts = ?,
+                    recovery_question_locked_until = ?
+                WHERE userid = ?
+                """,
+                (failed_attempts, lock_until_value, userid),
+            )
+
+            if lock_until_value:
+                clear_recovery_session()
+                return (
+                    jsonify(
+                        {
+                            "error": "Backup question recovery is locked after 3 failed attempts. Try again later.",
+                            "locked_until": lock_until_value,
+                            "remaining_attempts": 0,
+                        }
+                    ),
+                    403,
+                )
+
+            remaining_attempts = MAX_FAILED_ATTEMPTS - failed_attempts
+            return (
+                jsonify(
+                    {
+                        "error": f"Backup answer did not match. {remaining_attempts} attempt(s) left.",
+                        "remaining_attempts": remaining_attempts,
+                        "locked_until": None,
+                    }
+                ),
+                403,
+            )
+
+        if method == "passcode":
+            if not user["passcode_hash"]:
+                return jsonify({"error": "PIN passcode is not configured for this account."}), 400
+            if not passcode or not check_password_hash(user["passcode_hash"], passcode):
+                return jsonify({"error": "PIN passcode verification failed."}), 403
+        elif method == "biometric":
+            if not user["webauthn_credential_id"]:
+                return jsonify({"error": "Biometric is not configured for this account."}), 400
+            if not session.get("recovery_alt_verified"):
+                return jsonify({"error": "Complete biometric verification first."}), 403
+        else:
+            return jsonify({"error": "Invalid recovery method."}), 400
+
+        conn.execute(
+            """
+            UPDATE users
+            SET password_hash = ?,
+                failed_attempts = 0,
+                locked_until = NULL,
+                last_failed_at = NULL,
+                recovery_question_failed_attempts = 0,
+                recovery_question_locked_until = NULL
+            WHERE userid = ?
+            """,
+            (generate_password_hash(new_password), userid),
+        )
+
+    clear_recovery_session()
+    return jsonify({"message": "Password reset successful. Please sign in with your new password."})
 
 
 @app.get("/api/files")
